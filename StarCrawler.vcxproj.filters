@@ -25,6 +25,9 @@
     <Filter Include="Header Files\agg">
       <UniqueIdentifier>{aca8d6ee-e67c-472a-8193-17c558de0a34}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Doc">
+      <UniqueIdentifier>{22bfa782-d4d8-484f-95f7-2eb35d6cfdda}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -132,5 +135,10 @@
     <Image Include="res\StarCrawler.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md">
+      <Filter>Doc</Filter>
+    </None>
   </ItemGroup>
 </Project>
