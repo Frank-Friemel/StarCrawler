@@ -1,0 +1,136 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{175aa728-98ae-4efe-9afc-af8fad745d9b}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{fab0ac58-361b-4bb7-b868-c091dbfb1fbd}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{bbf273c4-2ad8-41e1-b505-b4ab6ef7fa43}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;jpg;jpeg;jpe;manifest</Extensions>
+    </Filter>
+    <Filter Include="Source Files\3D">
+      <UniqueIdentifier>{52348238-05f4-4a12-82ff-1a0b652318af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\3D">
+      <UniqueIdentifier>{cc4a2694-0652-40e8-9aa6-00d790502b2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\agg">
+      <UniqueIdentifier>{ad0e3ab8-6566-4c58-9137-4bcef6570294}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\agg">
+      <UniqueIdentifier>{aca8d6ee-e67c-472a-8193-17c558de0a34}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StarCrawler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MainDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3DObject.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="3DProjector.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="SDLPreviewDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_arc.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_arrowhead.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_bezier_arc.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_curves.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_trans_affine.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_vcgen_contour.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_vcgen_bspline.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="agg\agg_bspline.cpp">
+      <Filter>Source Files\agg</Filter>
+    </ClCompile>
+    <ClCompile Include="3DGlyph.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="3DWord.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="3DStar.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="AudioPlayer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MainDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="3DObject.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="3DProjector.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="SDLPreviewDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="agg\include\agg_pixfmt_rgba.h">
+      <Filter>Header Files\agg</Filter>
+    </ClInclude>
+    <ClInclude Include="3DGlyph.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="3DWord.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="3DStar.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="AudioPlayer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="StarCrawler.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\StarCrawler.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+</Project>
