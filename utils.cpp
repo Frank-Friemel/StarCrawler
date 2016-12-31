@@ -502,8 +502,10 @@ bool WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight)
 	// create ppm header - http://netpbm.sourceforge.net/doc/ppm.html
 	sprintf_s(buf, 64, "P6 %d %d 255 ", nWidth, nHeight);
 
+	DWORD dwWritten = 0;
+
 	// send header and bitmap data to encoder/file
-	if (!::WriteFile(hTo, buf, (DWORD)strlen(buf), NULL, NULL) || !::WriteFile(hTo, pFrameBuffer, nWidth * nHeight * 3, NULL, NULL))
+	if (!::WriteFile(hTo, buf, (DWORD)strlen(buf), &dwWritten, NULL) || !::WriteFile(hTo, pFrameBuffer, nWidth * nHeight * 3, &dwWritten, NULL))
 	{
 		return false;
 	}

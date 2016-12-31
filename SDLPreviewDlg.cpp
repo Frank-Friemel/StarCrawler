@@ -37,7 +37,7 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 	m_lfFramesPerSecond		= 25;
 	m_lfSceneProgress		= 0;
 	m_lfSceneStep			= 0;
-	m_strVCodec				= L"h264_qsv";
+	m_strVCodec				= L"libopenh264";
 
 	memset(&m_LogFont, 0, sizeof(m_LogFont));
 
@@ -322,10 +322,12 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 
 							for (auto i = 0; i < NUM_CHANNELS; ++i)
 							{
+								DWORD dwDummy = 0;
+
 								// channel x
-								ATLVERIFY(::ReadFile(fileTemp, &sample, sizeof(short), NULL, NULL));
+								ATLVERIFY(::ReadFile(fileTemp, &sample, sizeof(short), &dwDummy, NULL));
 								sample = (short)(((double)sample) * lfVolume);
-								ATLVERIFY(::WriteFile(m_fileTemp, &sample, sizeof(short), NULL, NULL));
+								ATLVERIFY(::WriteFile(m_fileTemp, &sample, sizeof(short), &dwDummy, NULL));
 								
 								sizePCM -= sizeof(short);
 							}
@@ -360,11 +362,13 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 						double lfVolume = ((double)sizePCM) / lfFadeTotal;
 
 						for (auto i = 0; i < NUM_CHANNELS; ++i)
-						{ 
+						{
+							DWORD dwDummy = 0;
+
 							// channel x
-							ATLVERIFY(::ReadFile(fileTemp, &sample, sizeof(short), NULL, NULL));
+							ATLVERIFY(::ReadFile(fileTemp, &sample, sizeof(short), &dwDummy, NULL));
 							sample = (short) (((double)sample) * lfVolume);
-							ATLVERIFY(::WriteFile(m_fileTemp, &sample, sizeof(short), NULL, NULL));
+							ATLVERIFY(::WriteFile(m_fileTemp, &sample, sizeof(short), &dwDummy, NULL));
 						}
 					}
 				}

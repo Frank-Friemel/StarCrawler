@@ -18,6 +18,8 @@ Download pre compiled binaries from [`Releases`](https://github.com/Frank-Frieme
 
 Already included within this project is [Anti-Grain Geometry](http://www.antigrain.com)
 
+### Powered by
+* [FFmpeg](https://ffmpeg.org/) The _Swiss Army Knife_ amongst multimedia frameworks
 
 ### License
 GPL
