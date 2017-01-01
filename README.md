@@ -26,6 +26,6 @@ GPL
 
 ### Screen
 
-[Sample roll](img/pic2.jpg)
-[GUI](img/pic1.jpg)
+![Sample roll](img/pic2.png)
+![GUI](img/pic1.png)
 
