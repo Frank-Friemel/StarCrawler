@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "AudioPlayer.h"
 
-
+// SDL Audio Callback
 static void my_sdl_audio_callback(void* pUserdata, Uint8* stream, int len)
 {
 	ATLASSERT(pUserdata);
@@ -38,6 +38,7 @@ bool CAudioPlayer::Init(HANDLE hDataSource)
 
 	memset(&wav_spec, 0, sizeof(wav_spec));
 
+	// WAV parameters as usual
 	wav_spec.callback	= my_sdl_audio_callback;
 	wav_spec.userdata	= this;
 	wav_spec.freq		= 44100;
@@ -45,6 +46,7 @@ bool CAudioPlayer::Init(HANDLE hDataSource)
 	wav_spec.samples	= 4096;
 	wav_spec.format		= AUDIO_S16LSB;
 
+	// thanks to SDL we don't have much todo
 	if (SDL_OpenAudio(&wav_spec, NULL) < 0)
 	{
 		m_hAudioData.Close();
@@ -82,6 +84,7 @@ void CAudioPlayer::OnPlayAudio(BYTE* pStream, DWORD dwLen)
 		DWORD	dwRead		= 0;
 		DWORD	dwReadTotal	= 0;
 
+		// read PCM data from handle directly to the sound buffer in mem
 		while (nTry > 0 && dwLen && ::ReadFile(m_hAudioData, pStream + dwReadTotal, dwLen, &dwRead, NULL))
 		{
 			if (dwRead == 0)

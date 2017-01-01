@@ -135,6 +135,12 @@
     <Image Include="res\StarCrawler.ico">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="img\pic1.png">
+      <Filter>Doc</Filter>
+    </Image>
+    <Image Include="img\pic2.png">
+      <Filter>Doc</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md">

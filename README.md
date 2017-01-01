@@ -24,3 +24,8 @@ Already included within this project is [Anti-Grain Geometry](http://www.antigra
 ### License
 GPL
 
+### Screen
+
+[Sample roll](img/pic2.jpg)
+[GUI](img/pic1.jpg)
+
