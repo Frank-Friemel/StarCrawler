@@ -239,6 +239,9 @@
     <ClCompile Include="agg\agg_vcgen_bspline.cpp" />
     <ClCompile Include="agg\agg_vcgen_contour.cpp" />
     <ClCompile Include="AudioPlayer.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
     <ClCompile Include="StarCrawler.cpp" />
     <ClCompile Include="MainDlg.cpp" />
     <ClCompile Include="SDLPreviewDlg.cpp" />
@@ -258,6 +261,9 @@
     <ClInclude Include="3DWord.h" />
     <ClInclude Include="agg\include\agg_pixfmt_rgba.h" />
     <ClInclude Include="AudioPlayer.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="MainDlg.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SDLPreviewDlg.h" />

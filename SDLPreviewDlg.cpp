@@ -151,7 +151,7 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 	m_lfSceneStep			= 1.0 / (m_lfFramesPerSecond * m_lfVideoLenInSeconds);
 	m_pCurrentFrameBuffer	= NULL;
 
-	Prepare(CSize(m_nWidth, m_nHeight));
+	Prepare(CSize(m_nWidth, m_nHeight), m_nBitPlaneCount);
 
 	m_ctlProgress.Attach(GetDlgItem(IDC_PROGRESS));
 
@@ -170,6 +170,8 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 		SDL_SetWindowTitle(m_pSDLWindow, T2CA(strTitle));
 		SDL_SetWindowSize(m_pSDLWindow, m_nWidth, m_nHeight);
 		SDL_ShowWindow(m_pSDLWindow);
+
+		InitImGui(m_hWnd);
 
 		// center the dialog on the screen
 		CenterWindow(GetParent());
@@ -436,6 +438,7 @@ void CSDLPreviewDlg::OnClose(UINT, int wID, HWND)
 	KillTimer(TIMER_ID);
 	CMyThread::Stop();
 
+	ShutdownImGui();
 	CloseSDL();
 
 	if (m_hVideoEncoder)
@@ -457,6 +460,58 @@ void CSDLPreviewDlg::OnClose(UINT, int wID, HWND)
 	EndDialog(wID);
 }
 
+void CSDLPreviewDlg::RenderImGui()
+{
+	ATLASSERT(!m_bExportMode);
+
+	POINT ptMouse;
+	GetCursorPos(&ptMouse);
+
+	::MapWindowPoints(NULL, m_hWnd, &ptMouse, 1);
+
+	NewFrameImGui(ptMouse);
+
+	static bool show_test_window = true;
+	static bool show_another_window = false;
+	
+	ImVec4 clear_color = ImColor(114, 144, 154);
+
+	// 1. Show a simple window
+	// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+	{
+		static float f = 0.0f;
+		ImGui::Text("Hello, world!");
+		ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+		ImGui::ColorEdit3("clear color", (float*)&clear_color);
+		
+		if (ImGui::Button("Test Window")) 
+			show_test_window ^= 1;
+		
+		if (ImGui::Button("Another Window")) 
+			show_another_window ^= 1;
+		
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	}
+
+	// 2. Show another simple window, this time using an explicit Begin/End pair
+	if (show_another_window)
+	{
+		ImGui::SetNextWindowSize(ImVec2(200,100), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Another Window", &show_another_window);
+		ImGui::Text("Hello");
+		ImGui::End();
+	}
+
+	// 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+	if (show_test_window)
+	{
+		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+		ImGui::ShowTestWindow(&show_test_window);
+	}
+
+	// Rendering
+	C3DProjector::RenderImGui();
+}
 
 void CSDLPreviewDlg::OnEvent()
 {
@@ -469,10 +524,10 @@ void CSDLPreviewDlg::OnEvent()
 		m_lfSceneProgress += m_lfSceneStep;
 
 		// draw 3D scene to frame buffer
-		m_pCurrentFrameBuffer = pFrameBuffer.get();
+		m_pCurrentFrameBuffer = *pFrameBuffer;
 
 		// the universe is "black"
-		memset(*m_pCurrentFrameBuffer, 0, m_nWidth * m_nHeight * m_nBitPlaneCount);
+		memset(m_pCurrentFrameBuffer, 0, m_nWidth * m_nHeight * m_nBitPlaneCount);
 
 		// draw stars in background
 		for each (auto& star in m_listStars)
@@ -484,6 +539,9 @@ void CSDLPreviewDlg::OnEvent()
 		{
 			word->Draw(this);
 		}
+		if (!m_bExportMode)
+			RenderImGui();
+
 		m_pCurrentFrameBuffer = NULL;
 
 		// the frame is done -> queue frame buffer to main thread
@@ -597,7 +655,7 @@ void CSDLPreviewDlg::OnTimer(UINT_PTR)
 					CAudioPlayer::Play();
 				}
 				// let SDL render the frame buffer
-				SDL_UpdateTexture(m_pSDLTexture, nullptr, *pFrameBuffer, m_nWidth * m_nBitPlaneCount);
+				SDL_UpdateTexture(m_pSDLTexture, nullptr, *pFrameBuffer, m_nStride);
 
 				SDL_RenderClear(m_pSDLRenderer);
 				SDL_RenderCopy(m_pSDLRenderer, m_pSDLTexture, nullptr, nullptr);
@@ -684,7 +742,7 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 	ras.gamma(agg::gamma_linear());
 	ras.add_path(curve);
 
-	agg::rendering_buffer rbuf(*m_pCurrentFrameBuffer, m_nWidth, m_nHeight, m_nWidth * m_nBitPlaneCount);
+	agg::rendering_buffer rbuf(m_pCurrentFrameBuffer, m_nWidth, m_nHeight, m_nStride);
 
 	// do some fading effect after we've reached 90% 
 	if (m_lfSceneProgress >= m_lfFadeOutMarker)

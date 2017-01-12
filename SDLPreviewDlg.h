@@ -23,8 +23,51 @@ public:
 		COMMAND_ID_HANDLER_EX(IDOK, OnClose)
 		COMMAND_ID_HANDLER_EX(IDCANCEL, OnClose)
 		MSG_WM_TIMER(OnTimer)
-	END_MSG_MAP()
-
+		}
+		ImGuiIO& io = ImGui::GetIO();
+		switch (uMsg)
+		{
+			case WM_LBUTTONDOWN:
+			io.MouseDown[0] = true;
+			break;
+			case WM_LBUTTONUP:
+			io.MouseDown[0] = false;
+			break;
+			case WM_RBUTTONDOWN:
+			io.MouseDown[1] = true;
+			break;
+			case WM_RBUTTONUP:
+			io.MouseDown[1] = false;
+			break;
+			case WM_MBUTTONDOWN:
+			io.MouseDown[2] = true;
+			break;
+			case WM_MBUTTONUP:
+			io.MouseDown[2] = false;
+			break;
+			case WM_MOUSEWHEEL:
+			io.MouseWheel += GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? +1.0f : -1.0f;
+			break;
+			case WM_MOUSEMOVE:
+			io.MousePos.x = (signed short)(lParam);
+			io.MousePos.y = (signed short)(lParam >> 16);
+			break;
+			case WM_KEYDOWN:
+			if (wParam < 256)
+				io.KeysDown[wParam] = 1;
+			break;
+			case WM_KEYUP:
+			if (wParam < 256)
+				io.KeysDown[wParam] = 0;
+			break;
+			case WM_CHAR:
+			// You can also use ToAscii()+GetKeyboardState() to retrieve characters.
+			if (wParam > 0 && wParam < 0x10000)
+				io.AddInputCharacter((unsigned short)wParam);
+			break;
+		}
+		return FALSE;
+	}
 	LRESULT OnInitDialog(HWND, LPARAM);
 	void	OnClose(UINT, int, HWND);
 	void	OnTimer(UINT_PTR);
@@ -38,6 +81,8 @@ private:
 	void	CloseSDL();
 	bool	CreateScene();
 	void	AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::dvec3& posLeftBorder, const glm::dvec3& posRightBorder, const glm::dvec3& boundsSpace, double lfVOffsetFactor = 1.5);
+
+	void	RenderImGui();
 
 public:
 	int													m_nWidth;
@@ -89,8 +134,6 @@ private:
 
 	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qInput;
 	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qOutput;
-
-	frame_buffer_t*										m_pCurrentFrameBuffer;
 
 	CHandle												m_hVideoEncoder;
 	CHandle												m_hVideoData;
