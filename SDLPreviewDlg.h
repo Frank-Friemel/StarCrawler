@@ -68,7 +68,9 @@ public:
 			case WM_CHAR:
 			// You can also use ToAscii()+GetKeyboardState() to retrieve characters.
 			if (wParam > 0 && wParam < 0x10000)
+			{	
 				io.AddInputCharacter((unsigned short)wParam);
+			}
 			break;
 		}
 		return FALSE;

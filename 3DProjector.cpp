@@ -12,9 +12,9 @@ typedef union _pixel_t
 {
 	_pixel_t(uint32_t i = 0)
 	{
-		integer = i;
+		rgba = i;
 	}
-	_pixel_t( uint8_t r, uint8_t g, uint8_t b, uint8_t a = 0 )
+	_pixel_t(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
 	{
 		this->r = r;
 		this->g = g;
@@ -22,23 +22,17 @@ typedef union _pixel_t
 		this->a = a;
 	}
 
-	uint32_t integer;			///< you can work directly with the truecolor integer if you like, but be careful about endianness!
+	uint32_t rgba;
 
 	struct
 	{
-		uint8_t r;			///< blue component
-		uint8_t g;			///< green component
-		uint8_t b;			///< red component
-		uint8_t a;			///< alpha component
+		uint8_t r;
+		uint8_t g;
+		uint8_t b;
+		uint8_t a;
 	};
 } pixel_t;
 
-
-pixel_t color_to_pixel(float c)
-{
-	auto brightness = mymax(0, mymin(255, (int)(255 * c)));
-	return pixel_t(brightness, brightness, brightness, 255);
-}
 
 C3DProjector::C3DProjector(double zCam /*= 10*/, double zViewer /*= 1200*/)
 {
@@ -47,6 +41,7 @@ C3DProjector::C3DProjector(double zCam /*= 10*/, double zViewer /*= 1200*/)
 	m_centerH	= 0;
 	m_centerV	= 0;
 	m_nStride	= 0;
+	m_bClip		= false;
 
 	m_c			= glm::dvec4(0.0, 0.0, zCam, 1);
 	m_e			= glm::dvec4(0.0, 0.0, zViewer, 1);
@@ -253,7 +248,8 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	io.KeyMap[ImGuiKey_Tab]			= VK_TAB;                       // Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array that we will update during the application lifetime.
+	// Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array that we will update during the application lifetime.
+	io.KeyMap[ImGuiKey_Tab]			= VK_TAB;                       
 	io.KeyMap[ImGuiKey_LeftArrow]	= VK_LEFT;
 	io.KeyMap[ImGuiKey_RightArrow]	= VK_RIGHT;
 	io.KeyMap[ImGuiKey_UpArrow]		= VK_UP;
@@ -280,13 +276,17 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 		io.IniFilename				= NULL;
 
 	// Build texture atlas
-	io.Fonts->GetTexDataAsAlpha8(&m_pImGuiFontTexture, &m_nFontTextureWidth, &m_nFontTextureHeight);
+	io.Fonts->GetTexDataAsAlpha8(&m_pImGuiTexture, &m_nTextureWidth, &m_nTextureHeight);
 
 	// Store our identifier
-	io.Fonts->TexID = (void *)(intptr_t)&m_pImGuiFontTexture;
+	io.Fonts->TexID					= m_pImGuiTexture;
 
+	// Init timers
 	QueryPerformanceCounter(&m_ImGuiPrevTime);
-	QueryPerformanceFrequency(&m_TicksPerSecond);
+	
+	LARGE_INTEGER liTicksPerSecond;
+	QueryPerformanceFrequency(&liTicksPerSecond);
+	m_TicksPerSecond = static_cast<float>(liTicksPerSecond.QuadPart);
 }
 
 void C3DProjector::ShutdownImGui()
@@ -310,7 +310,8 @@ void C3DProjector::NewFrameImGui()
 	// Setup time step
 	LARGE_INTEGER current_time;
 	QueryPerformanceCounter(&current_time);
-	io.DeltaTime = (float)(current_time.QuadPart - m_ImGuiPrevTime.QuadPart) / m_TicksPerSecond.QuadPart;
+	
+	io.DeltaTime	= (float)(current_time.QuadPart - m_ImGuiPrevTime.QuadPart) / m_TicksPerSecond;
 	m_ImGuiPrevTime = current_time;
 
 	// Start the frame
@@ -330,7 +331,7 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 {
 	for (int n = 0; n < draw_data->CmdListsCount; n++)
 	{
-		const ImDrawList* const cmd_list = draw_data->CmdLists[n];
+		const ImDrawList* cmd_list = draw_data->CmdLists[n];
 
 		auto& vertices = cmd_list->VtxBuffer;
 		auto& indices  = cmd_list->IdxBuffer;
@@ -359,18 +360,9 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 					const auto v1 = vertices[i1];
 					const auto v2 = vertices[i2];
 
-					const auto vc0 = ImColor(v0.col);
-					const auto vc1 = ImColor(v1.col);
-					const auto vc2 = ImColor(v2.col);
+					SetScissors(static_cast<int>(pcmd->ClipRect.x), static_cast<int>(round(pcmd->ClipRect.y)), static_cast<int>(pcmd->ClipRect.z), static_cast<int>(round(pcmd->ClipRect.w)));
 
-					if (!pcmd->TextureId || !generic_triangle_2d(v0.pos.x, v0.pos.y,
-											v2.pos.x, v2.pos.y,
-											v1.pos.x, v1.pos.y,
-											v0.uv.x, v0.uv.y,
-											v2.uv.x, v2.uv.y,
-											v1.uv.x, v1.uv.y,
-											vc0, vc2, vc1)
-						)
+					if (!pcmd->TextureId || !TriangleDraw(v0, v2, v1))
 					{
 						PIXEL2D pxl[4];
 						BYTE	cmd[4];
@@ -391,8 +383,11 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 						pxl[3].y	= v0.pos.y+1;
 						cmd[3]		= PT_LINETO;
 
-						PolyDraw(pxl, cmd, 4, vc0.Value.x, vc0.Value.y, vc0.Value.z, vc0.Value.w);
+						const auto c0 = ImColor(v0.col);
+
+						PolyDraw(pxl, cmd, 4, c0.Value.x, c0.Value.y, c0.Value.z, c0.Value.w);
 					}
+					ClearScissors();
 				}
 			}
 			idx_offset += pcmd->ElemCount;
@@ -400,123 +395,238 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 	}
 }
 
-bool C3DProjector::generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2)
+// http://forum.devmaster.net/t/advanced-rasterization/6145
+bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2)
 {
 	bool bDrawed = false;
+
+	const auto vx0 = vertex0.pos.x;
+	const auto vy0 = vertex0.pos.y;
+
+	const auto vx1 = vertex1.pos.x;
+	const auto vy1 = vertex1.pos.y;
+
+	const auto vx2 = vertex2.pos.x;
+	const auto vy2 = vertex2.pos.y;
+
+	const auto vu0 = vertex0.uv.x;
+	const auto vv0 = vertex0.uv.y;
+
+	const auto vu1 = vertex1.uv.x;
+	const auto vv1 = vertex1.uv.y;
+
+	const auto vu2 = vertex2.uv.x;
+	const auto vv2 = vertex2.uv.y;
+
+	const auto c0 = ImColor(vertex0.col);
+	const auto c1 = ImColor(vertex1.col);
+	const auto c2 = ImColor(vertex2.col);
 
 	// 24.8 fixed-point
 	const int precission = 4;
 	const int mask       = (1 << precission) - 1;
 
 	// Fixed-point coordinates
-	const int Y0 = (int)(y0 * static_cast<float>(1 << precission));
-	const int Y1 = (int)(y1 * static_cast<float>(1 << precission));
-	const int Y2 = (int)(y2 * static_cast<float>(1 << precission));
+	const int Y1 = (int)(vy0 * static_cast<float>(1 << precission));
+	const int Y2 = (int)(vy1 * static_cast<float>(1 << precission));
+	const int Y3 = (int)(vy2 * static_cast<float>(1 << precission));
 
-	const int X0 = (int)(x0 * static_cast<float>(1 << precission));
-	const int X1 = (int)(x1 * static_cast<float>(1 << precission));
-	const int X2 = (int)(x2 * static_cast<float>(1 << precission));
+	const int X1 = (int)(vx0 * static_cast<float>(1 << precission));
+	const int X2 = (int)(vx1 * static_cast<float>(1 << precission));
+	const int X3 = (int)(vx2 * static_cast<float>(1 << precission));
 
 	// Deltas
-	const int DX01 = X0 - X1;
 	const int DX12 = X1 - X2;
-	const int DX20 = X2 - X0;
+	const int DX23 = X2 - X3;
+	const int DX31 = X3 - X1;
 
-	const int DY01 = Y0 - Y1;
 	const int DY12 = Y1 - Y2;
-	const int DY20 = Y2 - Y0;
+	const int DY23 = Y2 - Y3;
+	const int DY31 = Y3 - Y1;
 
 	// Fixed-point deltas
-	const int FDX01 = DX01 << precission;
 	const int FDX12 = DX12 << precission;
-	const int FDX20 = DX20 << precission;
+	const int FDX23 = DX23 << precission;
+	const int FDX31 = DX31 << precission;
 
-	const int FDY01 = DY01 << precission;
 	const int FDY12 = DY12 << precission;
-	const int FDY20 = DY20 << precission;
+	const int FDY23 = DY23 << precission;
+	const int FDY31 = DY31 << precission;
 
 	// Bounding rectangle
-	int minx = (mymin(mymin(X0, X1), X2) + mask) >> precission;
-	int maxx = (mymax(mymax(X0, X1), X2) + mask) >> precission;
-	int miny = (mymin(mymin(Y0, Y1), Y2) + mask) >> precission;
-	int maxy = (mymax(mymax(Y0, Y1), Y2) + mask) >> precission;
+	int minx = (mymin(mymin(X1, X2), X3) + mask) >> precission;
+	int maxx = (mymax(mymax(X1, X2), X3) + mask) >> precission;
+	int miny = (mymin(mymin(Y1, Y2), Y3) + mask) >> precission;
+	int maxy = (mymax(mymax(Y1, Y2), Y3) + mask) >> precission;
+
+	// Block size, standard 8x8 (must be power of two)
+	const int q = 8;
+
+	// Start in corner of 8x8 block
+	minx &= ~(q - 1);
+	miny &= ~(q - 1);
 
 	// Half-edge constants
-	int C0 = DY01 * X0 - DX01 * Y0;
 	int C1 = DY12 * X1 - DX12 * Y1;
-	int C2 = DY20 * X2 - DX20 * Y2;
+	int C2 = DY23 * X2 - DX23 * Y2;
+	int C3 = DY31 * X3 - DX31 * Y3;
 
 	// Correct for fill convention
-	if (DY01 < 0 || (DY01 == 0 && DX01 > 0)) C0++;
-	if (DY12 < 0 || (DY12 == 0 && DX12 > 0)) C1++;
-	if (DY20 < 0 || (DY20 == 0 && DX20 > 0)) C2++;
+	if (DY12 < 0 || (DY12 == 0 && DX12 > 0)) 
+		C1++;
+	if (DY23 < 0 || (DY23 == 0 && DX23 > 0))
+		C2++;
+	if (DY31 < 0 || (DY31 == 0 && DX31 > 0)) 
+		C3++;
 
-	int CY0 = C0 + DX01 * (miny << precission) - DY01 * (minx << precission);
-	int CY1 = C1 + DX12 * (miny << precission) - DY12 * (minx << precission);
-	int CY2 = C2 + DX20 * (miny << precission) - DY20 * (minx << precission);
+	const auto red		= (c2.Value.x + c0.Value.x + c1.Value.x) / 3;
+	const auto green	= (c2.Value.y + c0.Value.y + c1.Value.y) / 3;
+	const auto blue		= (c2.Value.z + c0.Value.z + c1.Value.z) / 3;
+	const auto vu		= (vu2 + vu0 + vu1) / 3;
+	const auto vv		= (vv2 + vv0 + vv1) / 3;
+	const auto vtx		= mymax(0, mymin(static_cast<int>(vu * m_nTextureWidth), m_nTextureWidth - 1));
+	const auto vty		= mymax(0, mymin(static_cast<int>(vv * m_nTextureHeight), m_nTextureHeight - 1));
+	const auto alpha	= (c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * (m_pImGuiTexture[vtx + vty * m_nTextureWidth] * (1.0f / 255.0f));
 
-	auto iC = 1.0f / (CY0 + CY1 + CY2);
-
-	for (int y = miny; y < maxy; ++y)
+	// Loop through blocks
+	for (int y = miny; y < maxy; y += q)
 	{
-		if (y >= 0 && y < m_szViewport.cy)
-		{
-			int CX0 = CY0;
-			int CX1 = CY1;
-			int CX2 = CY2;
-
-			for (int x = minx; x < maxx; ++x)
-			{
-				if (x >= 0 && x < m_szViewport.cx)
-				{
-					if (CX0 > 0 && CX1 > 0 && CX2 > 0)
-					{
-						const auto r = (c2.Value.x * CX0 + c0.Value.x * CX1 + c1.Value.x * CX2) * iC;
-						const auto g = (c2.Value.y * CX0 + c0.Value.y * CX1 + c1.Value.y * CX2) * iC;
-						const auto b = (c2.Value.z * CX0 + c0.Value.z * CX1 + c1.Value.z * CX2) * iC;
-						const auto a = (c2.Value.w * CX0 + c0.Value.w * CX1 + c1.Value.w * CX2) * iC;
-						const auto u = (u2 * CX0 + u0 * CX1 + u1 * CX2) * iC;
-						const auto v = (v2 * CX0 + v0 * CX1 + v1 * CX2) * iC;
-
-						const auto tx = mymax(0, mymin(static_cast<int>(u * (m_nFontTextureWidth)), m_nFontTextureWidth - 1));
-						const auto ty = mymax(0, mymin(static_cast<int>(v * (m_nFontTextureHeight)), m_nFontTextureHeight - 1));
-
-						const auto texture_color = m_pImGuiFontTexture[tx + ty * m_nFontTextureWidth] * (1.0f / 255.0f);
-
-						blend_color(x, y, r, g, b, texture_color * a);
-						bDrawed = true;
-					}
-				}
-				else if (x >= m_szViewport.cx)
-					break;
-
-				CX0 -= FDY01;
-				CX1 -= FDY12;
-				CX2 -= FDY20;
-			}
-		}
-		else if (y >= m_szViewport.cy)
+		if (y >= m_szViewport.cy)
 			break;
 
-		CY0 += FDX01;
-		CY1 += FDX12;
-		CY2 += FDX20;
+		for (int x = minx; x < maxx; x += q)
+		{
+			if (x >= m_szViewport.cx)
+				break;
+
+			// Corners of block
+			int x0 = x << 4;
+			int x1 = (x + q - 1) << 4;
+			int y0 = y << 4;
+			int y1 = (y + q - 1) << 4;
+
+			// Evaluate half-space functions
+			bool a00 = C1 + DX12 * y0 - DY12 * x0 > 0;
+			bool a10 = C1 + DX12 * y0 - DY12 * x1 > 0;
+			bool a01 = C1 + DX12 * y1 - DY12 * x0 > 0;
+			bool a11 = C1 + DX12 * y1 - DY12 * x1 > 0;
+			
+			int a = (a00 << 0) | (a10 << 1) | (a01 << 2) | (a11 << 3);
+
+			bool b00 = C2 + DX23 * y0 - DY23 * x0 > 0;
+			bool b10 = C2 + DX23 * y0 - DY23 * x1 > 0;
+			bool b01 = C2 + DX23 * y1 - DY23 * x0 > 0;
+			bool b11 = C2 + DX23 * y1 - DY23 * x1 > 0;
+			
+			int b = (b00 << 0) | (b10 << 1) | (b01 << 2) | (b11 << 3);
+
+			bool c00 = C3 + DX31 * y0 - DY31 * x0 > 0;
+			bool c10 = C3 + DX31 * y0 - DY31 * x1 > 0;
+			bool c01 = C3 + DX31 * y1 - DY31 * x0 > 0;
+			bool c11 = C3 + DX31 * y1 - DY31 * x1 > 0;
+			
+			int c = (c00 << 0) | (c10 << 1) | (c01 << 2) | (c11 << 3);
+
+			// Skip block when outside an edge
+			if (a == 0x0 || b == 0x0 || c == 0x0)
+				continue;
+
+			// Accept whole block when totally covered
+			if (a == 0xF && b == 0xF && c == 0xF)
+			{
+				for (int iy = y; iy < y + q; ++iy)
+				{
+					if (iy >= 0 && iy < m_szViewport.cy)
+					{
+						for (int ix = x; ix < x + q; ++ix)
+						{
+							if (ix >= 0 && ix < m_szViewport.cx)
+							{
+								BlendColor(ix, iy, red, green, blue, alpha);
+								bDrawed = true;
+							}
+							else if (ix >= m_szViewport.cx)
+								break;
+						}
+					}
+					else if (iy >= m_szViewport.cy)
+						break;
+				}
+			}
+			else // Partially covered block
+			{
+				int CY1 = C1 + DX12 * y0 - DY12 * x0;
+				int CY2 = C2 + DX23 * y0 - DY23 * x0;
+				int CY3 = C3 + DX31 * y0 - DY31 * x0;
+
+				auto iC = 1.0f / (CY1 + CY2 + CY3);
+
+				for (int iy = y; iy < y + q; ++iy)
+				{
+					if (iy >= 0 && iy < m_szViewport.cy)
+					{
+						int CX1 = CY1;
+						int CX2 = CY2;
+						int CX3 = CY3;
+
+						for (int ix = x; ix < x + q; ++ix)
+						{
+							if (ix >= 0 && ix < m_szViewport.cx)
+							{
+								if (CX1 > 0 && CX2 > 0 && CX3 > 0)
+								{
+									const auto r = (c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC;
+									const auto g = (c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC;
+									const auto b = (c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC;
+									const auto a = (c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC;
+									const auto u = (vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC;
+									const auto v = (vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC;
+
+									const auto tx = mymax(0, mymin(static_cast<int>(u * m_nTextureWidth), m_nTextureWidth - 1));
+									const auto ty = mymax(0, mymin(static_cast<int>(v * m_nTextureHeight), m_nTextureHeight - 1));
+
+									const auto texture_color = m_pImGuiTexture[tx + ty * m_nTextureWidth] * (1.0f / 255.0f);
+
+									BlendColor(ix, iy, r, g, b, texture_color * a);
+									bDrawed = true;
+								}
+							}
+							else if (ix >= m_szViewport.cx)
+								break;
+
+							CX1 -= FDY12;
+							CX2 -= FDY23;
+							CX3 -= FDY31;
+						}
+					}
+					else if (iy >= m_szViewport.cy)
+						break;
+					
+					CY1 += FDX12;
+					CY2 += FDX23;
+					CY3 += FDX31;
+				}
+			}
+		}
 	}
 	return bDrawed;
 }
 
-void C3DProjector::blend_color(int x, int y, float r, float g, float b, float a)
+void C3DProjector::BlendColor(int x, int y, float r, float g, float b, float a)
 {
-	uint32_t* p = (uint32_t*) &m_pCurrentFrameBuffer[x*sizeof(uint32_t) + y * m_nStride];
+	if (!m_bClip || (x >= m_rectClip.left && x <= m_rectClip.right && y >= m_rectClip.top && y <= m_rectClip.bottom))
+	{
+		uint32_t* p = (uint32_t*) &m_pCurrentFrameBuffer[x*sizeof(uint32_t) + y * m_nStride];
 	
-	pixel_t back(*p);
-	pixel_t	pixel((uint8_t)(r * 255), (uint8_t)(g * 255), (uint8_t)(b * 255), 255);
+		pixel_t back(*p);
+		pixel_t	pixel((uint8_t)(r * 255), (uint8_t)(g * 255), (uint8_t)(b * 255));
 
-	auto ia = (int)(a * 255);
+		auto ia = (int)(a * 255);
 
-	pixel.r = (int)back.r + ((int)pixel.r - (int)back.r) * ia / 255;
-	pixel.g = (int)back.g + ((int)pixel.g - (int)back.g) * ia / 255;
-	pixel.b = (int)back.b + ((int)pixel.b - (int)back.b) * ia / 255;
+		pixel.r = (int)back.r + ((int)pixel.r - (int)back.r) * ia / 255;
+		pixel.g = (int)back.g + ((int)pixel.g - (int)back.g) * ia / 255;
+		pixel.b = (int)back.b + ((int)pixel.b - (int)back.b) * ia / 255;
 
-	*p = pixel.integer;
+		*p = pixel.rgba;
+	}
 }

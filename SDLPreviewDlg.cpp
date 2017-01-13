@@ -759,12 +759,18 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 		agg::pixfmt_rgba32						pixf(rbuf);
 		agg::renderer_base<agg::pixfmt_rgba32>	ren(pixf);
 
+		if (m_bClip)
+			ren.clip_box(m_rectClip.left, m_rectClip.top, m_rectClip.right, m_rectClip.bottom);
+
 		agg::render_scanlines_aa_solid(ras, sl, ren, agg::rgba(r, g, b, alpha));
 	}
 	else
 	{
 		agg::pixfmt_rgb24						pixf(rbuf);
 		agg::renderer_base<agg::pixfmt_rgb24>	ren(pixf);
+
+		if (m_bClip)
+			ren.clip_box(m_rectClip.left, m_rectClip.top, m_rectClip.right, m_rectClip.bottom);
 
 		agg::render_scanlines_aa_solid(ras, sl, ren, agg::rgba(r, g, b, alpha));
 	}

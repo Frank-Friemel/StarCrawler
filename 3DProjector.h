@@ -24,8 +24,6 @@ public:
 	void PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const;
 	void PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const;
 
-	virtual void PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha) = 0;
-
 	// 0.0 .... 1.0
 	static double	Random();
 
@@ -52,17 +50,35 @@ public:
 	{
 		return m_lfHeight;
 	}
+protected:
 	// imgui stuff
 	void InitImGui(HWND hWnd = NULL, bool bIniFile = false);
 	void ShutdownImGui();
 	void NewFrameImGui();
 	void RenderImGui();
 
+public:
+	// implementation
+	virtual void	PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha) = 0;
+	virtual void	BlendColor(int x, int y, float r, float g, float b, float a);
+	virtual void	SetScissors(int left, int top, int right, int bottom)
+	{
+		m_rectClip.left		= left;
+		m_rectClip.top		= top;
+		m_rectClip.right	= right;
+		m_rectClip.bottom	= bottom;
+		m_bClip				= true;
+	}
+	virtual void	ClearScissors()
+	{
+		m_bClip = false;
+	}
+protected:
+	virtual void	RenderDrawLists(ImDrawData* draw_data);
+
 private:
-	static void ImGui_Impl_RenderDrawLists(ImDrawData* draw_data);
-	virtual void RenderDrawLists(ImDrawData* draw_data);
-	bool generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2);
-	void blend_color(int x, int y, float r, float g, float b, float a);
+	static void		ImGui_Impl_RenderDrawLists(ImDrawData* draw_data);
+	bool			TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2);
 
 protected:
 	SIZE				m_szViewport;
@@ -75,11 +91,13 @@ protected:
 	glm::dvec4			m_c;	// cam 
 	glm::dvec4			m_e;	// viewer
 	
-	unsigned char*		m_pImGuiFontTexture;
-	int					m_nFontTextureWidth;
-	int					m_nFontTextureHeight;
+	unsigned char*		m_pImGuiTexture;
+	int					m_nTextureWidth;
+	int					m_nTextureHeight;
 	LARGE_INTEGER		m_ImGuiPrevTime;
-	LARGE_INTEGER		m_TicksPerSecond;
+	float				m_TicksPerSecond;
+	CRect				m_rectClip;
+	bool				m_bClip;
 
 public:
 	glm::dmat4			m_matCamView;
