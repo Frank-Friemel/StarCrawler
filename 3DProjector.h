@@ -60,7 +60,7 @@ protected:
 public:
 	// implementation
 	virtual void	PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha) = 0;
-	virtual void	BlendColor(int x, int y, float r, float g, float b, float a);
+	virtual void	BlendColor(int x, int y, int r, int g, int b, int a);
 	virtual void	SetScissors(int left, int top, int right, int bottom)
 	{
 		m_rectClip.left		= left;

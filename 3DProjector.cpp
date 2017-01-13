@@ -479,14 +479,14 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	if (DY31 < 0 || (DY31 == 0 && DX31 > 0)) 
 		C3++;
 
-	const auto red		= (c2.Value.x + c0.Value.x + c1.Value.x) / 3;
-	const auto green	= (c2.Value.y + c0.Value.y + c1.Value.y) / 3;
-	const auto blue		= (c2.Value.z + c0.Value.z + c1.Value.z) / 3;
+	const int red		= static_cast<int>((c2.Value.x + c0.Value.x + c1.Value.x) * 255 / 3);
+	const int green		= static_cast<int>((c2.Value.y + c0.Value.y + c1.Value.y) * 255 / 3);
+	const int blue		= static_cast<int>((c2.Value.z + c0.Value.z + c1.Value.z) * 255 / 3);
 	const auto vu		= (vu2 + vu0 + vu1) / 3;
 	const auto vv		= (vv2 + vv0 + vv1) / 3;
 	const auto vtx		= mymax(0, mymin(static_cast<int>(vu * m_nTextureWidth), m_nTextureWidth - 1));
 	const auto vty		= mymax(0, mymin(static_cast<int>(vv * m_nTextureHeight), m_nTextureHeight - 1));
-	const auto alpha	= (c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * (m_pImGuiTexture[vtx + vty * m_nTextureWidth] * (1.0f / 255.0f));
+	const int alpha		= static_cast<int>((c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * m_pImGuiTexture[vtx + vty * m_nTextureWidth]);
 
 	// Loop through blocks
 	for (int y = miny; y < maxy; y += q)
@@ -578,16 +578,15 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 									const auto r = (c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC;
 									const auto g = (c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC;
 									const auto b = (c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC;
-									const auto a = (c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC;
 									const auto u = (vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC;
 									const auto v = (vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC;
 
 									const auto tx = mymax(0, mymin(static_cast<int>(u * m_nTextureWidth), m_nTextureWidth - 1));
 									const auto ty = mymax(0, mymin(static_cast<int>(v * m_nTextureHeight), m_nTextureHeight - 1));
 
-									const auto texture_color = m_pImGuiTexture[tx + ty * m_nTextureWidth] * (1.0f / 255.0f);
+									const auto a = (c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC * m_pImGuiTexture[tx + ty * m_nTextureWidth];
 
-									BlendColor(ix, iy, r, g, b, texture_color * a);
+									BlendColor(ix, iy, static_cast<int>(r*255), static_cast<int>(g*255), static_cast<int>(b*255), static_cast<int>(a));
 									bDrawed = true;
 								}
 							}
@@ -612,21 +611,15 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	return bDrawed;
 }
 
-void C3DProjector::BlendColor(int x, int y, float r, float g, float b, float a)
+
+void C3DProjector::BlendColor(int x, int y, int r, int g, int b, int a)
 {
 	if (!m_bClip || (x >= m_rectClip.left && x <= m_rectClip.right && y >= m_rectClip.top && y <= m_rectClip.bottom))
 	{
-		uint32_t* p = (uint32_t*) &m_pCurrentFrameBuffer[x*sizeof(uint32_t) + y * m_nStride];
-	
-		pixel_t back(*p);
-		pixel_t	pixel((uint8_t)(r * 255), (uint8_t)(g * 255), (uint8_t)(b * 255));
+		auto back = (pixel_t*) &m_pCurrentFrameBuffer[x*sizeof(pixel_t) + y * m_nStride];
 
-		auto ia = (int)(a * 255);
-
-		pixel.r = (int)back.r + ((int)pixel.r - (int)back.r) * ia / 255;
-		pixel.g = (int)back.g + ((int)pixel.g - (int)back.g) * ia / 255;
-		pixel.b = (int)back.b + ((int)pixel.b - (int)back.b) * ia / 255;
-
-		*p = pixel.rgba;
+		back->r += ((r - back->r) * a / 255);
+		back->g += ((g - back->g) * a / 255);
+		back->b += ((b - back->b) * a / 255);
 	}
 }
