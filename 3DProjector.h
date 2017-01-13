@@ -55,16 +55,14 @@ public:
 	// imgui stuff
 	void InitImGui(HWND hWnd = NULL, bool bIniFile = false);
 	void ShutdownImGui();
-	void NewFrameImGui(POINT ptMouse);
+	void NewFrameImGui();
 	void RenderImGui();
 
 private:
 	static void ImGui_Impl_RenderDrawLists(ImDrawData* draw_data);
 	virtual void RenderDrawLists(ImDrawData* draw_data);
-	void generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, float c0, float c1, float c2, float a0, float a1, float a2);
-	void generic_triangle_2d_c(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2);
-	void blend_color(int x, int y, float c, float a);
-	void blend_color_c(int x, int y, float r, float g, float b, float a);
+	bool generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2);
+	void blend_color(int x, int y, float r, float g, float b, float a);
 
 protected:
 	SIZE				m_szViewport;

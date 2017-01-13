@@ -62,6 +62,8 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 	m_strAudioFile			= L"TestTrack01.mp3";
 	m_bWithAudio			= true;
 	m_bSuccess				= false;
+
+	m_bDoubleClick			= false;
 }
 
 
@@ -464,13 +466,6 @@ void CSDLPreviewDlg::RenderImGui()
 {
 	ATLASSERT(!m_bExportMode);
 
-	POINT ptMouse;
-	GetCursorPos(&ptMouse);
-
-	::MapWindowPoints(NULL, m_hWnd, &ptMouse, 1);
-
-	NewFrameImGui(ptMouse);
-
 	static bool show_test_window = true;
 	static bool show_another_window = false;
 	
@@ -525,6 +520,17 @@ void CSDLPreviewDlg::OnEvent()
 
 		// draw 3D scene to frame buffer
 		m_pCurrentFrameBuffer = *pFrameBuffer;
+
+		if (!m_bExportMode)
+		{ 
+			NewFrameImGui();
+
+			ImGuiIO& io = ImGui::GetIO();
+			io.MouseDoubleClicked[0] = m_bDoubleClick;
+
+			if (m_bDoubleClick)
+				m_bDoubleClick = false;
+		}
 
 		// the universe is "black"
 		memset(m_pCurrentFrameBuffer, 0, m_nWidth * m_nHeight * m_nBitPlaneCount);

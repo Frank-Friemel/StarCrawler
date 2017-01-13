@@ -26,9 +26,9 @@ typedef union _pixel_t
 
 	struct
 	{
-		uint8_t b;			///< blue component
+		uint8_t r;			///< blue component
 		uint8_t g;			///< green component
-		uint8_t r;			///< red component
+		uint8_t b;			///< red component
 		uint8_t a;			///< alpha component
 	};
 } pixel_t;
@@ -299,7 +299,7 @@ void C3DProjector::RenderImGui()
 	ImGui::Render();
 }
 
-void C3DProjector::NewFrameImGui(POINT ptMouse)
+void C3DProjector::NewFrameImGui()
 {
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -363,21 +363,14 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 					const auto vc1 = ImColor(v1.col);
 					const auto vc2 = ImColor(v2.col);
 
-					const auto c0 = (vc0.Value.x + vc0.Value.y + vc0.Value.z) / 3;
-					const auto c1 = (vc1.Value.x + vc1.Value.y + vc1.Value.z) / 3;
-					const auto c2 = (vc2.Value.x + vc2.Value.y + vc2.Value.z) / 3;
-
-					if (pcmd->TextureId)
-					{
-						generic_triangle_2d_c(v0.pos.x, v0.pos.y,
+					if (!pcmd->TextureId || !generic_triangle_2d(v0.pos.x, v0.pos.y,
 											v2.pos.x, v2.pos.y,
 											v1.pos.x, v1.pos.y,
 											v0.uv.x, v0.uv.y,
 											v2.uv.x, v2.uv.y,
 											v1.uv.x, v1.uv.y,
-											vc0, vc2, vc1);					
-					}
-					else
+											vc0, vc2, vc1)
+						)
 					{
 						PIXEL2D pxl[4];
 						BYTE	cmd[4];
@@ -386,12 +379,12 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 						pxl[0].y	= v0.pos.y;
 						cmd[0]		= PT_MOVETO;
 
-						pxl[1].x	= v1.pos.x+1;
-						pxl[1].y	= v1.pos.y+1;
+						pxl[1].x	= v2.pos.x;
+						pxl[1].y	= v2.pos.y;
 						cmd[1]		= PT_LINETO;
 
-						pxl[2].x	= v2.pos.x+1;
-						pxl[2].y	= v2.pos.y+1;
+						pxl[2].x	= v1.pos.x;
+						pxl[2].y	= v1.pos.y;
 						cmd[2]		= PT_LINETO;
 
 						pxl[3].x	= v0.pos.x+1;
@@ -401,20 +394,16 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 						PolyDraw(pxl, cmd, 4, vc0.Value.x, vc0.Value.y, vc0.Value.z, vc0.Value.w);
 					}
 				}
-				//fill_rect_2d(*imgui_render_target, (int)min.x, (int)min.y, (int)max.x, (int)max.y, 1.0f);
-				//const D3D10_RECT r = { (LONG)pcmd->ClipRect.x, (LONG)pcmd->ClipRect.y, (LONG)pcmd->ClipRect.z, (LONG)pcmd->ClipRect.w };
-				//ctx->PSSetShaderResources(0, 1, (ID3D10ShaderResourceView**)&pcmd->TextureId);
-				//ctx->RSSetScissorRects(1, &r);
-				//ctx->DrawIndexed(pcmd->ElemCount, idx_offset, vtx_offset);
 			}
 			idx_offset += pcmd->ElemCount;
 		}
 	}
 }
 
-
-void C3DProjector::generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, float c0, float c1, float c2, float a0, float a1, float a2)
+bool C3DProjector::generic_triangle_2d(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2)
 {
+	bool bDrawed = false;
+
 	// 24.8 fixed-point
 	const int precission = 4;
 	const int mask       = (1 << precission) - 1;
@@ -468,7 +457,7 @@ void C3DProjector::generic_triangle_2d(float x0, float y0, float x1, float y1, f
 
 	auto iC = 1.0f / (CY0 + CY1 + CY2);
 
-	for (int y = miny; y < maxy; y++)
+	for (int y = miny; y < maxy; ++y)
 	{
 		if (y >= 0 && y < m_szViewport.cy)
 		{
@@ -476,106 +465,7 @@ void C3DProjector::generic_triangle_2d(float x0, float y0, float x1, float y1, f
 			int CX1 = CY1;
 			int CX2 = CY2;
 
-			for (int x = minx; x < maxx; x++)
-			{
-				if (x >= 0 && x < m_szViewport.cx)
-				{
-					if (CX0 > 0 && CX1 > 0 && CX2 > 0)
-					{
-						const auto c = (c2 * CX0 + c0 * CX1 + c1 * CX2) * iC;
-						const auto a = (a2 * CX0 + a0 * CX1 + a1 * CX2) * iC;
-						const auto u = (u2 * CX0 + u0 * CX1 + u1 * CX2) * iC;
-						const auto v = (v2 * CX0 + v0 * CX1 + v1 * CX2) * iC;
-
-						const auto tx = mymax(0, mymin(static_cast<int>(u * (m_nFontTextureWidth)), m_nFontTextureWidth - 1));
-						const auto ty = mymax(0, mymin(static_cast<int>(v * (m_nFontTextureHeight)), m_nFontTextureHeight - 1));
-
-						const auto texture_color = m_pImGuiFontTexture[tx + ty * m_nFontTextureWidth] * (1.0f / 255.0f);
-
-						blend_color(x, y, c, texture_color * a);
-					}
-				}
-				else if (x >= m_szViewport.cx)
-					break;
-
-				CX0 -= FDY01;
-				CX1 -= FDY12;
-				CX2 -= FDY20;
-			}
-		}
-		else if (y >= m_szViewport.cy)
-			return;
-
-		CY0 += FDX01;
-		CY1 += FDX12;
-		CY2 += FDX20;
-	}
-}
-
-void C3DProjector::generic_triangle_2d_c(float x0, float y0, float x1, float y1, float x2, float y2, float u0, float v0, float u1, float v1, float u2, float v2, const ImColor& c0, const ImColor& c1, const ImColor& c2)
-{
-	// 24.8 fixed-point
-	const int precission = 4;
-	const int mask       = (1 << precission) - 1;
-
-	// Fixed-point coordinates
-	const int Y0 = (int)(y0 * static_cast<float>(1 << precission));
-	const int Y1 = (int)(y1 * static_cast<float>(1 << precission));
-	const int Y2 = (int)(y2 * static_cast<float>(1 << precission));
-
-	const int X0 = (int)(x0 * static_cast<float>(1 << precission));
-	const int X1 = (int)(x1 * static_cast<float>(1 << precission));
-	const int X2 = (int)(x2 * static_cast<float>(1 << precission));
-
-	// Deltas
-	const int DX01 = X0 - X1;
-	const int DX12 = X1 - X2;
-	const int DX20 = X2 - X0;
-
-	const int DY01 = Y0 - Y1;
-	const int DY12 = Y1 - Y2;
-	const int DY20 = Y2 - Y0;
-
-	// Fixed-point deltas
-	const int FDX01 = DX01 << precission;
-	const int FDX12 = DX12 << precission;
-	const int FDX20 = DX20 << precission;
-
-	const int FDY01 = DY01 << precission;
-	const int FDY12 = DY12 << precission;
-	const int FDY20 = DY20 << precission;
-
-	// Bounding rectangle
-	int minx = (mymin(mymin(X0, X1), X2) + mask) >> precission;
-	int maxx = (mymax(mymax(X0, X1), X2) + mask) >> precission;
-	int miny = (mymin(mymin(Y0, Y1), Y2) + mask) >> precission;
-	int maxy = (mymax(mymax(Y0, Y1), Y2) + mask) >> precission;
-
-	// Half-edge constants
-	int C0 = DY01 * X0 - DX01 * Y0;
-	int C1 = DY12 * X1 - DX12 * Y1;
-	int C2 = DY20 * X2 - DX20 * Y2;
-
-	// Correct for fill convention
-	if (DY01 < 0 || (DY01 == 0 && DX01 > 0)) C0++;
-	if (DY12 < 0 || (DY12 == 0 && DX12 > 0)) C1++;
-	if (DY20 < 0 || (DY20 == 0 && DX20 > 0)) C2++;
-
-	int CY0 = C0 + DX01 * (miny << precission) - DY01 * (minx << precission);
-	int CY1 = C1 + DX12 * (miny << precission) - DY12 * (minx << precission);
-	int CY2 = C2 + DX20 * (miny << precission) - DY20 * (minx << precission);
-
-	auto iC = 1.0f / (CY0 + CY1 + CY2);
-
-	for (int y = miny; y < maxy; y++)
-	{
-		if (y >= 0 && y < m_szViewport.cy)
-		{
-			int CX0 = CY0;
-			int CX1 = CY1;
-			int CX2 = CY2;
-
-			for (int x = minx; x < maxx; x++)
+			for (int x = minx; x < maxx; ++x)
 			{
 				if (x >= 0 && x < m_szViewport.cx)
 				{
@@ -593,7 +483,8 @@ void C3DProjector::generic_triangle_2d_c(float x0, float y0, float x1, float y1,
 
 						const auto texture_color = m_pImGuiFontTexture[tx + ty * m_nFontTextureWidth] * (1.0f / 255.0f);
 
-						blend_color_c(x, y, r, g, b, texture_color * a);
+						blend_color(x, y, r, g, b, texture_color * a);
+						bDrawed = true;
 					}
 				}
 				else if (x >= m_szViewport.cx)
@@ -605,18 +496,21 @@ void C3DProjector::generic_triangle_2d_c(float x0, float y0, float x1, float y1,
 			}
 		}
 		else if (y >= m_szViewport.cy)
-			return;
+			break;
 
 		CY0 += FDX01;
 		CY1 += FDX12;
 		CY2 += FDX20;
 	}
+	return bDrawed;
 }
 
-void C3DProjector::blend_color(int x, int y, float c, float a)
+void C3DProjector::blend_color(int x, int y, float r, float g, float b, float a)
 {
-	pixel_t back(*((uint32_t*) &m_pCurrentFrameBuffer[x*4 + y * m_nStride]));
-	auto	pixel = color_to_pixel(c);
+	uint32_t* p = (uint32_t*) &m_pCurrentFrameBuffer[x*sizeof(uint32_t) + y * m_nStride];
+	
+	pixel_t back(*p);
+	pixel_t	pixel((uint8_t)(r * 255), (uint8_t)(g * 255), (uint8_t)(b * 255), 255);
 
 	auto ia = (int)(a * 255);
 
@@ -624,19 +518,5 @@ void C3DProjector::blend_color(int x, int y, float c, float a)
 	pixel.g = (int)back.g + ((int)pixel.g - (int)back.g) * ia / 255;
 	pixel.b = (int)back.b + ((int)pixel.b - (int)back.b) * ia / 255;
 
-	*((uint32_t*) &m_pCurrentFrameBuffer[x*4 + y * m_nStride]) = pixel.integer;
-}
-
-void C3DProjector::blend_color_c(int x, int y, float r, float g, float b, float a)
-{
-	pixel_t back(*((uint32_t*) &m_pCurrentFrameBuffer[x*4 + y * m_nStride]));
-	pixel_t	pixel(r * 255, g * 255, b * 255, 255);
-
-	auto ia = (int)(a * 255);
-
-	pixel.r = (int)back.r + ((int)pixel.r - (int)back.r) * ia / 255;
-	pixel.g = (int)back.g + ((int)pixel.g - (int)back.g) * ia / 255;
-	pixel.b = (int)back.b + ((int)pixel.b - (int)back.b) * ia / 255;
-
-	*((uint32_t*) &m_pCurrentFrameBuffer[x*4 + y * m_nStride]) = pixel.integer;
+	*p = pixel.integer;
 }

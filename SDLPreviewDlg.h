@@ -18,6 +18,8 @@ public:
 
 	enum { IDD = IDD_PREVIEW };
 
+	bool m_bDoubleClick;
+
 	BEGIN_MSG_MAP_EX(CMainDlg)
 		MSG_WM_INITDIALOG(OnInitDialog)
 		COMMAND_ID_HANDLER_EX(IDOK, OnClose)
@@ -29,6 +31,9 @@ public:
 		{
 			case WM_LBUTTONDOWN:
 			io.MouseDown[0] = true;
+			break;
+			case WM_LBUTTONDBLCLK:
+			m_bDoubleClick = true;
 			break;
 			case WM_LBUTTONUP:
 			io.MouseDown[0] = false;
