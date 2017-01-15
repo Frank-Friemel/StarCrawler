@@ -17,7 +17,7 @@ Download pre compiled binaries from [`Releases`](https://github.com/Frank-Frieme
 * [`SDL`](https://www.libsdl.org/) Simple Directmedia Layer
 * [`GLM`](http://glm.g-truc.net) OpenGL Mathematics
 
-Already included within this project is [Anti-Grain Geometry](http://www.antigrain.com) and [dear imgui](https://github.com/ocornut/imgui). `dear imgui` code is licended under MIT license.
+Already included within this project is [Anti-Grain Geometry](http://www.antigrain.com) and [dear imgui](https://github.com/ocornut/imgui). `dear imgui` code is licensed under MIT license.
 
 ### Powered by
 * [FFmpeg](https://ffmpeg.org/) The _Swiss Army Knife_ amongst multimedia frameworks
