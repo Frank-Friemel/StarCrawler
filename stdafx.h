@@ -31,6 +31,7 @@ extern CAppModule _Module;
 #include <atlsync.h>
 
 #include <stdint.h>
+#include <time.h>
 
 #include <list>
 #include <queue>

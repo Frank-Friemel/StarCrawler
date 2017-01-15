@@ -81,12 +81,13 @@ void CMainDlg::ParametersToControls()
 	SetDlgItemInt(IDC_ANGLE			, (UINT)m_pPreviewDlg->m_lfViewAngle);
 	SetDlgItemInt(IDC_VIDEO_LEN		, (UINT)m_pPreviewDlg->m_lfVideoLenInSeconds);
 	SetDlgItemInt(IDC_FPS			, (UINT)m_pPreviewDlg->m_lfFramesPerSecond);
-	SetDlgItemInt(IDC_SCROLL_SPEED	, (UINT)(m_pPreviewDlg->m_lfScrollSpeed*100.0));
-	SetDlgItemInt(IDC_FLIGHT_SPEED	, (UINT)(m_pPreviewDlg->m_lfFlightSpeed*(-100.0)));
+	SetDlgItemInt(IDC_SCROLL_SPEED	, m_pPreviewDlg->GetScrollSpeed());
+	SetDlgItemInt(IDC_FLIGHT_SPEED	, m_pPreviewDlg->GetFlightSpeed());
 	SetDlgItemInt(IDC_STAR_COUNT	, (UINT)m_pPreviewDlg->m_nStarCount);
 	SetDlgItemText(IDC_FONT			, m_pPreviewDlg->m_LogFont.lfFaceName);
 	SetDlgItemText(IDC_AUDIO_FILE	, m_pPreviewDlg->m_strAudioFile.c_str());
 	CheckDlgButton(IDC_AUDIO		, m_pPreviewDlg->m_bWithAudio ? BST_CHECKED : BST_UNCHECKED);
+	CheckDlgButton(IDC_HEADUP_DISPLAY, m_pPreviewDlg->m_bHeadupDisplay ? BST_CHECKED : BST_UNCHECKED);
 	GetDlgItem(IDC_AUDIO_FILE).EnableWindow(m_pPreviewDlg->m_bWithAudio);
 
 	// h264_qsv;libx264;libopenh264;mpeg4;
@@ -101,8 +102,9 @@ void CMainDlg::ParametersToControls()
 	SetDlgItemText(IDC_CODEC		, m_pPreviewDlg->m_strVCodec.c_str());
 
 	CComboBox ctlAudioTracks = GetDlgItem(IDC_AUDIO_FILE);
-
-	ctlAudioTracks.Dir(0, L"*.mp3");
+	
+	if (ctlAudioTracks.GetCount() == 0)
+		ctlAudioTracks.Dir(0, L"*.mp3");
 }
 
 void CMainDlg::ParametersFromControls()
@@ -117,13 +119,14 @@ void CMainDlg::ParametersFromControls()
 
 	m_pPreviewDlg->m_nWidth					= GetDlgItemInt(IDC_WIDTH);
 	m_pPreviewDlg->m_nHeight				= GetDlgItemInt(IDC_HEIGHT);
-	m_pPreviewDlg->m_lfViewAngle			= (double)GetDlgItemInt(IDC_ANGLE);
+	m_pPreviewDlg->m_lfViewAngle			= (float)GetDlgItemInt(IDC_ANGLE);
 	m_pPreviewDlg->m_lfVideoLenInSeconds	= (double)GetDlgItemInt(IDC_VIDEO_LEN);
 	m_pPreviewDlg->m_lfFramesPerSecond		= (double)GetDlgItemInt(IDC_FPS);
-	m_pPreviewDlg->m_lfScrollSpeed			= (double)GetDlgItemInt(IDC_SCROLL_SPEED) / 100.0;
-	m_pPreviewDlg->m_lfFlightSpeed			= (double)GetDlgItemInt(IDC_FLIGHT_SPEED) / (-100.0);
-	m_pPreviewDlg->m_nStarCount				= GetDlgItemInt(IDC_STAR_COUNT);
+	m_pPreviewDlg->SetScrollSpeed(GetDlgItemInt(IDC_SCROLL_SPEED));
+	m_pPreviewDlg->SetFlightSpeed(GetDlgItemInt(IDC_FLIGHT_SPEED));
+	m_pPreviewDlg->m_nStarCount				= (int)GetDlgItemInt(IDC_STAR_COUNT);
 	m_pPreviewDlg->m_bWithAudio				= IsDlgButtonChecked(IDC_AUDIO) == BST_CHECKED ? true : false;
+	m_pPreviewDlg->m_bHeadupDisplay			= IsDlgButtonChecked(IDC_HEADUP_DISPLAY) == BST_CHECKED ? true : false;
 
 	GetDlgItemText(IDC_AUDIO_FILE, strValue);
 	m_pPreviewDlg->m_strAudioFile			= (PCWSTR)strValue;
@@ -155,6 +158,8 @@ void CMainDlg::OnPreview(UINT, int, HWND)
 
 	m_pPreviewDlg->m_bExportMode = false;
 	m_pPreviewDlg->DoModal(m_hWnd);
+
+	ParametersToControls();
 
 	BringToFront();
 }

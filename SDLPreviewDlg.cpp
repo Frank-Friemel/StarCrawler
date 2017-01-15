@@ -17,7 +17,12 @@
 #include "3DWord.h"
 #include "3DStar.h"
 
-#define TIMER_ID 9999
+#define TIMER_ID					9999
+
+#define DEFAULT_FLIGHT_SPEED		(-0.1)
+#define	DEFAULT_SCROLL_SPEED		(0.02)
+#define STAR_FIELD_DISTANCE			(-80.0)
+#define FADEOUT_MARKER_PERCENT		(90)		// begin to fade out scene at 90%
 
 CSDLPreviewDlg::CSDLPreviewDlg()
 {
@@ -31,12 +36,10 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 	m_strHeadline			= L"StarCrawler Demo";
 	m_strMessage			= L"Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.";
 	m_lfFontScale			= 0.5;
-	m_lfScrollSpeed			= 0.02;
-	m_lfFlightSpeed			= -0.1;
+	m_lfScrollSpeed			= DEFAULT_SCROLL_SPEED;
+	m_lfFlightSpeed			= DEFAULT_FLIGHT_SPEED;
 	m_lfVideoLenInSeconds	= 45.0;
 	m_lfFramesPerSecond		= 25;
-	m_lfSceneProgress		= 0;
-	m_lfSceneStep			= 0;
 	m_strVCodec				= L"libopenh264";
 
 	memset(&m_LogFont, 0, sizeof(m_LogFont));
@@ -48,13 +51,8 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 
 	wcscpy_s(m_LogFont.lfFaceName, _countof(m_LogFont.lfFaceName), L"Arial Narrow");
 
-	// begin to fade out scene at 90%
-	m_lfFadeOutMarker		= 0.9; 
-
-	m_lfStarFieldDistance	= -80.0;
 	m_nStarCount			= 300;
 	m_bExportMode			= false;
-	m_nFrameCounter			= 0;
 	m_nFramesTotal			= (int)(m_lfVideoLenInSeconds * m_lfFramesPerSecond);
 	m_nBitPlaneCount		= m_bExportMode ? 3 : 4;
 
@@ -63,7 +61,7 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 	m_bWithAudio			= true;
 	m_bSuccess				= false;
 
-	m_bDoubleClick			= false;
+	m_bHeadupDisplay		= true;
 }
 
 
@@ -121,10 +119,10 @@ void CSDLPreviewDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
 		}
 		if (dwReadTotal)
 		{
-			if (m_lfSceneProgress > m_lfFadeOutMarker)
+			if (m_nProgress > FADEOUT_MARKER_PERCENT)
 			{
 				// fade sound after we've reached 90%
-				int nVolume = (int)(((double)SDL_MIX_MAXVOLUME) * ((1.0 - m_lfSceneProgress) * 10.0));
+				int nVolume = (int)(((double)SDL_MIX_MAXVOLUME) * ((100 - m_nProgress) / 10.0));
 
 				if (nVolume > SDL_MIX_MAXVOLUME)
 					nVolume = SDL_MIX_MAXVOLUME;
@@ -145,13 +143,15 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 {
 	USES_CONVERSION;
 
-	m_lfSceneProgress		= 0;
-	m_nFrameCounter			= 0;
 	m_bSuccess				= false;
-	m_nBitPlaneCount		= m_bExportMode ? 3 : 4;
-	m_nFramesTotal			= (int)(m_lfVideoLenInSeconds * m_lfFramesPerSecond);
-	m_lfSceneStep			= 1.0 / (m_lfFramesPerSecond * m_lfVideoLenInSeconds);
+	m_bPaused				= false;
 	m_pCurrentFrameBuffer	= NULL;
+	m_nBitPlaneCount		= m_bExportMode ? 3 : 4;
+
+	m_nFrameCounter.reset();
+	m_nFramesTotal			= (int)(m_lfVideoLenInSeconds * m_lfFramesPerSecond);
+				
+	m_nRandSeed				= (UINT)::time(NULL);
 
 	Prepare(CSize(m_nWidth, m_nHeight), m_nBitPlaneCount);
 
@@ -279,7 +279,7 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 				ALIGN_DOWN_TO_SAMPLE(sizePCM);
 
 				// calc offset where we're fading out
-				ULONGLONG offFade = (ULONGLONG)(m_lfFadeOutMarker * sizePCM);
+				ULONGLONG offFade = (ULONGLONG)(FADEOUT_MARKER_PERCENT * sizePCM);
 
 				// align offset to sample border
 				ALIGN_DOWN_TO_SAMPLE(offFade);
@@ -392,23 +392,6 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 		}
 		ATLASSERT(m_hVideoData);
 	}
-	m_posCam	= glm::dvec4(0, 0, 10, 1);
-	m_posView	= glm::dvec4(0, 0, 0, 1);
-
-	glm::dvec3 myRotationAxis(1, 0, 0);
-	glm::dmat4 matRot = glm::rotate((glm::dvec3::value_type)glm::radians(m_lfViewAngle), myRotationAxis);
-
-	m_posCam = matRot * m_posCam;
-
-	glm::dmat4 matTransStartOffset = glm::translate(glm::dvec3(0, 0, -10));
-
-	m_posCam	= matTransStartOffset * m_posCam;
-	m_posView	= matTransStartOffset * m_posView;
-	m_matScroll = glm::translate(glm::dvec3(0, 0, m_lfScrollSpeed));
-	m_matFlight = glm::translate(glm::dvec3(0, 0, m_lfFlightSpeed));
-	m_vecUp		= glm::dvec3(0, 1, 0);
-
-	m_matCamView = glm::lookAt(glm::dvec3(m_posCam.x, m_posCam.y, m_posCam.z), glm::dvec3(m_posView.x, m_posView.y, m_posView.z), m_vecUp);
 
 	// Create 3D Objects ....
 	if (CreateScene())
@@ -462,52 +445,6 @@ void CSDLPreviewDlg::OnClose(UINT, int wID, HWND)
 	EndDialog(wID);
 }
 
-void CSDLPreviewDlg::RenderImGui()
-{
-	ATLASSERT(!m_bExportMode);
-
-	static bool show_test_window = true;
-	static bool show_another_window = false;
-	
-	ImVec4 clear_color = ImColor(114, 144, 154);
-
-	// 1. Show a simple window
-	// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
-	{
-		static float f = 0.0f;
-		ImGui::Text("Hello, world!");
-		ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-		ImGui::ColorEdit3("clear color", (float*)&clear_color);
-		
-		if (ImGui::Button("Test Window")) 
-			show_test_window ^= 1;
-		
-		if (ImGui::Button("Another Window")) 
-			show_another_window ^= 1;
-		
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	}
-
-	// 2. Show another simple window, this time using an explicit Begin/End pair
-	if (show_another_window)
-	{
-		ImGui::SetNextWindowSize(ImVec2(200,100), ImGuiSetCond_FirstUseEver);
-		ImGui::Begin("Another Window", &show_another_window);
-		ImGui::Text("Hello");
-		ImGui::End();
-	}
-
-	// 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-	if (show_test_window)
-	{
-		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-		ImGui::ShowTestWindow(&show_test_window);
-	}
-
-	// Rendering
-	C3DProjector::RenderImGui();
-}
-
 void CSDLPreviewDlg::OnEvent()
 {
 	// this worker thread constructs the frames
@@ -516,20 +453,12 @@ void CSDLPreviewDlg::OnEvent()
 	// whenever a frame buffer is available -> fill it
 	while (m_qInput.unqueue(pFrameBuffer))
 	{
-		m_lfSceneProgress += m_lfSceneStep;
-
 		// draw 3D scene to frame buffer
 		m_pCurrentFrameBuffer = *pFrameBuffer;
 
-		if (!m_bExportMode)
+		if (!m_bExportMode && m_bHeadupDisplay)
 		{ 
 			NewFrameImGui();
-
-			ImGuiIO& io = ImGui::GetIO();
-			io.MouseDoubleClicked[0] = m_bDoubleClick;
-
-			if (m_bDoubleClick)
-				m_bDoubleClick = false;
 		}
 
 		// the universe is "black"
@@ -545,7 +474,7 @@ void CSDLPreviewDlg::OnEvent()
 		{
 			word->Draw(this);
 		}
-		if (!m_bExportMode)
+		if (!m_bExportMode && m_bHeadupDisplay)
 			RenderImGui();
 
 		m_pCurrentFrameBuffer = NULL;
@@ -554,15 +483,9 @@ void CSDLPreviewDlg::OnEvent()
 		m_qOutput.queue(pFrameBuffer);
 
 		// update 3D data of scene
-		m_posCam	= m_matScroll * m_posCam;
-		m_posView	= m_matScroll * m_posView;
-
-		m_posCam	= m_matFlight * m_posCam;
-		m_posView	= m_matFlight * m_posView;
-
-		for each (auto& word in m_listWords)
+		if (!m_bPaused)
 		{
-			word->Move(m_matFlight);
+			MoveScene();
 		}
 		m_matCamView = glm::lookAt(glm::dvec3(m_posCam.x, m_posCam.y, m_posCam.z), glm::dvec3(m_posView.x, m_posView.y, m_posView.z), m_vecUp);
 
@@ -572,12 +495,12 @@ void CSDLPreviewDlg::OnEvent()
 			if (!star->IsVisible(this))
 			{
 				// revisit flight passed stars which gives the illusion of an infinite star field
-				star->Randomize(this, star->m_vecVertices[0].z + m_lfStarFieldDistance);
+				star->Randomize(this, star->m_vecVertices[0].z + STAR_FIELD_DISTANCE);
 				ATLASSERT(star->IsVisible(this));
 			}
 		}
 		// fade out text message, after a while
-		if (m_lfSceneProgress >= 0.50)
+		if (m_nProgress >= 50)
 		{
 			size_t n = m_listWords.size() * 25 / 100;
 
@@ -588,36 +511,36 @@ void CSDLPreviewDlg::OnEvent()
 				if (--n == 0)
 					break;
 			}
-		}
-		if (m_lfSceneProgress >= 0.55)
-		{
-			size_t n = m_listWords.size() * 50 / 100;
-
-			for each (auto& word in m_listWords)
+			if (m_nProgress >= 55)
 			{
-				word->SetAlpha(word->GetAlpha() - 0.001);
+				size_t n = m_listWords.size() * 50 / 100;
 
-				if (--n == 0)
-					break;
-			}
-		}
-		if (m_lfSceneProgress >= 0.60)
-		{
-			size_t n = m_listWords.size() * 75 / 100;
+				for each (auto& word in m_listWords)
+				{
+					word->SetAlpha(word->GetAlpha() - 0.001);
 
-			for each (auto& word in m_listWords)
-			{
-				word->SetAlpha(word->GetAlpha() - 0.001);
+					if (--n == 0)
+						break;
+				}
+				if (m_nProgress >= 60)
+				{
+					size_t n = m_listWords.size() * 75 / 100;
 
-				if (--n == 0)
-					break;
-			}
-		}
-		if (m_lfSceneProgress >= 0.65)
-		{
-			for each (auto& word in m_listWords)
-			{
-				word->SetAlpha(word->GetAlpha() - 0.001);
+					for each (auto& word in m_listWords)
+					{
+						word->SetAlpha(word->GetAlpha() - 0.001);
+
+						if (--n == 0)
+							break;
+					}
+					if (m_nProgress >= 65)
+					{
+						for each (auto& word in m_listWords)
+						{
+							word->SetAlpha(word->GetAlpha() - 0.001);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -634,7 +557,8 @@ void CSDLPreviewDlg::OnTimer(UINT_PTR)
 		if (::WaitForSingleObject(m_qOutput.m_hEvent, 5) != WAIT_TIMEOUT && m_qOutput.unqueue(pFrameBuffer))
 		{
 			// ...yes!
-			++m_nFrameCounter;
+			if (!m_bPaused)
+				m_nFrameCounter.increment();
 
 			if (m_bExportMode)
 			{
@@ -684,7 +608,7 @@ void CSDLPreviewDlg::OnTimer(UINT_PTR)
 		{
 			WCHAR buf[256];
 		
-			swprintf_s(buf, 256, L"Missing frame at #%d / #%d\n", m_nFrameCounter, m_nFramesTotal);
+			swprintf_s(buf, 256, L"Missing frame at %d %% (Frame #%d of #%d Frames)\n", m_nProgress, m_nFrameCounter.get(), m_nFramesTotal);
 			OutputDebugStringW(buf);
 		}	
 	}
@@ -751,8 +675,13 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 	agg::rendering_buffer rbuf(m_pCurrentFrameBuffer, m_nWidth, m_nHeight, m_nStride);
 
 	// do some fading effect after we've reached 90% 
-	if (m_lfSceneProgress >= m_lfFadeOutMarker)
-		alpha *= ((1.0-m_lfSceneProgress) * 10.0);
+	if (m_nProgress >= FADEOUT_MARKER_PERCENT)
+	{ 
+		alpha *= ((100 - m_nProgress) / 10.0);
+
+		if (alpha > 1.0)
+			alpha = 1.0;
+	}
 
 	if (m_nBitPlaneCount == 4)
 	{
@@ -778,6 +707,26 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 
 bool CSDLPreviewDlg::CreateScene()
 {
+	srand(m_nRandSeed);
+
+	m_posCam	= glm::dvec4(0, 0, 10, 1);
+	m_posView	= glm::dvec4(0, 0, 0, 1);
+
+	glm::dvec3 myRotationAxis(1, 0, 0);
+	glm::dmat4 matRot = glm::rotate((glm::dvec3::value_type)glm::radians(m_lfViewAngle), myRotationAxis);
+
+	m_posCam	= matRot * m_posCam;
+
+	glm::dmat4 matTransStartOffset = glm::translate(glm::dvec3(0, 0, -10));
+
+	m_posCam	= matTransStartOffset * m_posCam;
+	m_posView	= matTransStartOffset * m_posView;
+	m_matScroll = glm::translate(glm::dvec3(0, 0, m_lfScrollSpeed));
+	m_matFlight = glm::translate(glm::dvec3(0, 0, m_lfFlightSpeed));
+	m_vecUp		= glm::dvec3(0, 1, 0);
+
+	m_matCamView = glm::lookAt(glm::dvec3(m_posCam.x, m_posCam.y, m_posCam.z), glm::dvec3(m_posView.x, m_posView.y, m_posView.z), m_vecUp);
+
 	m_listWords.clear();
 	m_listStars.clear();
 
@@ -816,7 +765,7 @@ bool CSDLPreviewDlg::CreateScene()
 	{
 		std::shared_ptr<C3DStar> pStar = std::make_shared<C3DStar>();
 
-		pStar->Randomize(this, m_lfStarFieldDistance);
+		pStar->Randomize(this, STAR_FIELD_DISTANCE);
 
 		m_listStars.push_back(pStar);
 	}
@@ -937,3 +886,196 @@ void CSDLPreviewDlg::AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::
 		}
 	}
 }
+
+void CSDLPreviewDlg::MoveScene(int nSteps /* = 1*/)
+{
+	if (nSteps < 0)
+	{
+		nSteps *= (-1);
+
+		glm::dmat4 matScroll = glm::inverse(m_matScroll);
+		glm::dmat4 matFlight = glm::inverse(glm::translate(glm::dvec3(0, 0, DEFAULT_FLIGHT_SPEED)));
+
+		do
+		{
+			m_posCam	= matScroll * m_posCam;
+			m_posView	= matScroll * m_posView;
+
+			m_posCam	= matFlight * m_posCam;
+			m_posView	= matFlight * m_posView;
+
+			for each (auto& word in m_listWords)
+			{
+				word->Move(matFlight);
+			}
+		}
+		while(--nSteps > 0);
+	}
+	else
+	{
+		do
+		{
+			m_posCam	= m_matScroll * m_posCam;
+			m_posView	= m_matScroll * m_posView;
+
+			m_posCam	= m_matFlight * m_posCam;
+			m_posView	= m_matFlight * m_posView;
+
+			for each (auto& word in m_listWords)
+			{
+				word->Move(m_matFlight);
+			}
+		}
+		while(--nSteps > 0);
+	}
+}
+
+void CSDLPreviewDlg::PlayPause()
+{
+	m_bPaused = !m_bPaused;
+
+	if (m_bPaused)
+	{
+		CAudioPlayer::Pause();
+	}
+	else
+	{
+		CAudioPlayer::Play();
+	}
+}
+
+void CSDLPreviewDlg::RenderImGui()
+{
+	ATLASSERT(!m_bExportMode && m_bHeadupDisplay);
+
+#if 0
+	static bool show_test_window = true;
+	static bool show_another_window = false;
+
+	ImVec4 clear_color = ImColor(114, 144, 154);
+
+	// 1. Show a simple window
+	// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+	{
+		static float f = 0.0f;
+		ImGui::Text("Hello, world!");
+		ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+		ImGui::ColorEdit3("clear color", (float*)&clear_color);
+
+		if (ImGui::Button("Test Window")) 
+			show_test_window ^= 1;
+
+		if (ImGui::Button("Another Window")) 
+			show_another_window ^= 1;
+
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	}
+
+	// 2. Show another simple window, this time using an explicit Begin/End pair
+	if (show_another_window)
+	{
+		ImGui::SetNextWindowSize(ImVec2(200,100), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Another Window", &show_another_window);
+		ImGui::Text("Hello");
+		ImGui::End();
+	}
+
+	// 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+	if (show_test_window)
+	{
+		ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+		ImGui::ShowTestWindow(&show_test_window);
+	}
+#endif
+	if (ImGui::Begin("Headup Display", &m_bHeadupDisplay))
+	{
+		if (m_bHeadupDisplay)
+		{
+			ImGui::PushItemWidth(150);
+
+			int nProgress = m_nProgress;
+
+			if (ImGui::SliderInt("Progess", &nProgress, 0, 100, "%.0f %%"))
+			{
+				if (nProgress == 100)
+					nProgress = 99;
+
+				if (nProgress != m_nProgress)
+				{
+					bool bTempPaused = false;
+
+					if (!m_bPaused)
+					{
+						PlayPause();
+						bTempPaused = true;
+					}
+					int nStep = 1;
+
+					if (nProgress < m_nProgress)
+						nStep = -1;
+
+					if (nProgress <= 50)
+					{
+						for each (auto& word in m_listWords)
+						{
+							word->SetAlpha(1);
+						}
+					}
+					while (nProgress != m_nProgress)
+					{
+						MoveScene(nStep);
+						m_nFrameCounter += nStep;
+					}
+
+					if (bTempPaused)
+					{
+						PlayPause();
+					}
+				}
+			}
+			ImGui::SameLine();
+
+			if (ImGui::Button(m_bPaused ? "Play" : "Pause"))
+			{
+				PlayPause();
+			}
+
+			if (ImGui::SliderFloat("Angle", &m_lfViewAngle, 10, 45, "%.0f deg"))
+			{
+				CreateScene();
+				MoveScene(m_nFrameCounter);
+			}
+			if (ImGui::SliderInt("Star Count", &m_nStarCount, 50, 1000))
+			{
+				CreateScene();
+				MoveScene(m_nFrameCounter);
+			}
+			int nScrollSpeed = (int) GetScrollSpeed();
+
+			if (ImGui::SliderInt("Scroll Speed", &nScrollSpeed, 1, 10))
+			{
+				SetScrollSpeed((UINT)nScrollSpeed);
+			}
+			int nFlightSpeed = (int) GetFlightSpeed();
+
+			if (ImGui::SliderInt("Flight Speed", &nFlightSpeed, 5, 100))
+			{
+				SetFlightSpeed((UINT)nFlightSpeed);
+			}
+			ImGui::PopItemWidth();
+		}
+		else
+		{
+			if (m_bPaused)
+			{
+				m_bPaused = false;
+				CAudioPlayer::Play();
+			}
+		}
+	}
+	ImGui::End();
+
+	// Rendering
+	C3DProjector::RenderImGui();
+}
+

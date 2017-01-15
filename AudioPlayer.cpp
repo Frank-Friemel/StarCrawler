@@ -57,12 +57,14 @@ bool CAudioPlayer::Init(HANDLE hDataSource)
 
 void CAudioPlayer::Play()
 {
-	SDL_PauseAudio(0);
+	if (m_hAudioData)
+		SDL_PauseAudio(0);
 }
 
 void CAudioPlayer::Pause()
 {
-	SDL_PauseAudio(1);
+	if (m_hAudioData)
+		SDL_PauseAudio(1);
 }
 
 void CAudioPlayer::Close()

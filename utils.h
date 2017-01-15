@@ -707,6 +707,131 @@ protected:
 typedef CTokenizerT<std::wstring>		CTokenizer;
 typedef CTokenizerT<std::string>		CTokenizerA;
 
+////////////////////////////////////////////////////////////////////////////
+// interlocked_t
 
+class interlocked_t
+{
+public:
+	interlocked_t(LONG nInitValue = 0)
+	{ 
+		_value = nInitValue;
+	}
+	inline LONG increment()
+	{
+		// result is the incremented value
+		return InterlockedIncrement(&_value);
+	}
+	inline LONG decrement()
+	{ 
+		// result is the decremented value
+		return InterlockedDecrement(&_value);
+	}
+	// pre-increment 
+	inline LONG operator ++()
+	{
+		return increment(); 
+	}
+	// pre-decrement 
+	inline LONG operator --()
+	{ 
+		return decrement();
+	}
+	inline LONG clear()
+	{
+		// result is the cleared value
+		return InterlockedExchange(&_value, 0); 
+	}
+	inline LONG reset() 
+	{ 
+		return clear();
+	}
+	template<class T>
+	inline T set(T nNewValue)
+	{ 
+		// result is the original value
+		return static_cast<T>(InterlockedExchange(&_value, static_cast<LONG>(nNewValue)));
+	}
+	inline bool set(bool bNewValue)
+	{
+		return set(bNewValue ? 1l : 0l) ? true : false;
+	}
+	inline LONG get() const
+	{ 
+		return InterlockedCompareExchange((volatile LONG *)&_value, 0, 0);
+	}
+	inline operator bool () const
+	{
+		return get() ? true : false;
+	}
+	template<class T>
+	inline operator T () const
+	{
+		return static_cast<T>(get());
+	}
+	template<class T>
+	inline T operator=(T i)
+	{
+		return set(i);
+	}
+	template<class T>
+	inline bool operator==(T i) const
+	{
+		return (static_cast<T>(get())) == i ? true : false;
+	}
+	template<class T>
+	inline bool operator!=(T i) const
+	{
+		return (static_cast<T>(get())) != i ? true : false;
+	}
+	template<class T>
+	inline bool operator<=(T i) const
+	{
+		return (static_cast<T>(get())) <= i ? true : false;
+	}
+	template<class T>
+	inline bool operator>=(T i) const
+	{
+		return (static_cast<T>(get())) >= i ? true : false;
+	}
+	template<class T>
+	inline bool operator<(T i) const
+	{
+		return (static_cast<T>(get())) < i ? true : false;
+	}
+	template<class T>
+	inline bool operator>(T i) const
+	{
+		return (static_cast<T>(get())) > i ? true : false;
+	}
+	inline bool operator!() const
+	{
+		return get() ? false : true;
+	}
+	template<class T>
+	inline T add(T i)
+	{
+		// result is value + i
+		return static_cast<T>(InterlockedAdd(&_value, static_cast<LONG>(i)));
+	}
+	template<class T>
+	inline T sub(T i)
+	{
+		// result is value - i
+		return static_cast<T>(InterlockedAdd(&_value, static_cast<LONG>(i) * (-1)));
+	}
+	template<class T>
+	inline T operator+=(T i)
+	{
+		return add(i);
+	}
+	template<class T>
+	inline T operator-=(T i)
+	{
+		return sub(i);
+	}
+protected:
+	volatile LONG _value;
+};
 
 }

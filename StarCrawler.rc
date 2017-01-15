@@ -127,6 +127,7 @@ BEGIN
     COMBOBOX        IDC_AUDIO_FILE,222,194,88,114,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
     LTEXT           "Export Codec",IDC_STATIC,30,216,44,8
     COMBOBOX        IDC_CODEC,30,228,90,84,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Headup Display",IDC_HEADUP_DISPLAY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,150,217,65,10
     PUSHBUTTON      "Preview...",IDC_PREVIEW,150,228,67,14
     PUSHBUTTON      "Export...",IDC_EXPORT,236,228,67,14
     PUSHBUTTON      "Exit",IDCANCEL,340,7,50,14
@@ -242,8 +243,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,2
- PRODUCTVERSION 1,0,0,2
+ FILEVERSION 1,0,0,3
+ PRODUCTVERSION 1,0,0,3
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -259,12 +260,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "StarCrawler Module"
-            VALUE "FileVersion", "1.0.0.2"
+            VALUE "FileVersion", "1.0.0.3"
             VALUE "InternalName", "StarCrawler"
             VALUE "LegalCopyright", "Copyright Frank Friemel 2016"
             VALUE "OriginalFilename", "StarCrawler.exe"
             VALUE "ProductName", "StarCrawler Module"
-            VALUE "ProductVersion", "1.0.0.2"
+            VALUE "ProductVersion", "1.0.0.3"
         END
     END
     BLOCK "VarFileInfo"

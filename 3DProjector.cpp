@@ -248,6 +248,12 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
+	{
+		// fill global io with default values
+		ImGuiIO init;
+		io = init;
+	}
+
 	// Keyboard mapping. ImGui will use those indices to peek into the io.KeyDown[] array that we will update during the application lifetime.
 	io.KeyMap[ImGuiKey_Tab]			= VK_TAB;                       
 	io.KeyMap[ImGuiKey_LeftArrow]	= VK_LEFT;
@@ -276,8 +282,23 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 		io.IniFilename				= NULL;
 
 	// Build texture atlas
-	io.Fonts->GetTexDataAsAlpha8(&m_pImGuiTexture, &m_nTextureWidth, &m_nTextureHeight);
+	unsigned char* pImGuiTexture	= NULL;
 
+	io.Fonts->GetTexDataAsAlpha8(&pImGuiTexture, &m_nTextureWidth, &m_nTextureHeight);
+
+	m_lfTextureWidth	= static_cast<float>(m_nTextureWidth);
+	m_lfTextureHeight	= static_cast<float>(m_nTextureHeight);
+
+	ATLASSERT(pImGuiTexture);
+	ATLVERIFY(m_pImGuiTexture.Reallocate(m_nTextureHeight*m_nTextureWidth));
+
+	for (int y = 0; y < m_nTextureHeight; ++y)
+	{
+		for (int x = 0; x < m_nTextureWidth; ++x)
+		{
+			m_pImGuiTexture[y*m_nTextureWidth + x] = static_cast<float>(*pImGuiTexture++);
+		}
+	}
 	// Store our identifier
 	io.Fonts->TexID					= m_pImGuiTexture;
 
@@ -316,6 +337,12 @@ void C3DProjector::NewFrameImGui()
 
 	// Start the frame
 	ImGui::NewFrame();
+
+	if (m_bDoubleClick)
+	{ 
+		--m_bDoubleClick;
+		io.MouseDoubleClicked[0] = true;
+	}
 }
 
 void C3DProjector::ImGui_Impl_RenderDrawLists(ImDrawData* draw_data)
@@ -454,17 +481,15 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	const int FDY31 = DY31 << precission;
 
 	// Bounding rectangle
-	int minx = (mymin(mymin(X1, X2), X3) + mask) >> precission;
-	int maxx = (mymax(mymax(X1, X2), X3) + mask) >> precission;
-	int miny = (mymin(mymin(Y1, Y2), Y3) + mask) >> precission;
-	int maxy = (mymax(mymax(Y1, Y2), Y3) + mask) >> precission;
+	const int maxx = (mymax(mymax(X1, X2), X3) + mask) >> precission;
+	const int maxy = (mymax(mymax(Y1, Y2), Y3) + mask) >> precission;
 
 	// Block size, standard 8x8 (must be power of two)
 	const int q = 8;
 
 	// Start in corner of 8x8 block
-	minx &= ~(q - 1);
-	miny &= ~(q - 1);
+	const int minx = ((mymin(mymin(X1, X2), X3) + mask) >> precission) & ~(q - 1);
+	const int miny = ((mymin(mymin(Y1, Y2), Y3) + mask) >> precission) & ~(q - 1);
 
 	// Half-edge constants
 	int C1 = DY12 * X1 - DX12 * Y1;
@@ -479,14 +504,10 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	if (DY31 < 0 || (DY31 == 0 && DX31 > 0)) 
 		C3++;
 
-	const int red		= static_cast<int>((c2.Value.x + c0.Value.x + c1.Value.x) * 255 / 3);
-	const int green		= static_cast<int>((c2.Value.y + c0.Value.y + c1.Value.y) * 255 / 3);
-	const int blue		= static_cast<int>((c2.Value.z + c0.Value.z + c1.Value.z) * 255 / 3);
-	const auto vu		= (vu2 + vu0 + vu1) / 3;
-	const auto vv		= (vv2 + vv0 + vv1) / 3;
-	const auto vtx		= mymax(0, mymin(static_cast<int>(vu * m_nTextureWidth), m_nTextureWidth - 1));
-	const auto vty		= mymax(0, mymin(static_cast<int>(vv * m_nTextureHeight), m_nTextureHeight - 1));
-	const int alpha		= static_cast<int>((c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * m_pImGuiTexture[vtx + vty * m_nTextureWidth]);
+	int red		= -1;
+	int green	= -1;
+	int blue	= -1;
+	int alpha	= -1;
 
 	// Loop through blocks
 	for (int y = miny; y < maxy; y += q)
@@ -542,6 +563,18 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 						{
 							if (ix >= 0 && ix < m_szViewport.cx)
 							{
+								if (red < 0)
+								{
+									int vu		= static_cast<int>((vu2 + vu0 + vu1) / 3 * m_lfTextureWidth);
+									int vv		= static_cast<int>((vv2 + vv0 + vv1) / 3 * m_lfTextureHeight);
+									int vtx		= mymax(0, mymin(vu, m_nTextureWidth - 1));
+									int vty		= mymax(0, mymin(vv, m_nTextureHeight - 1));
+									
+									red		= static_cast<int>((c2.Value.x + c0.Value.x + c1.Value.x) * 255 / 3);
+									green	= static_cast<int>((c2.Value.y + c0.Value.y + c1.Value.y) * 255 / 3);
+									blue	= static_cast<int>((c2.Value.z + c0.Value.z + c1.Value.z) * 255 / 3);
+									alpha	= static_cast<int>((c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * m_pImGuiTexture[vtx + vty * m_nTextureWidth]);
+								}
 								BlendColor(ix, iy, red, green, blue, alpha);
 								bDrawed = true;
 							}
@@ -559,7 +592,8 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 				int CY2 = C2 + DX23 * y0 - DY23 * x0;
 				int CY3 = C3 + DX31 * y0 - DY31 * x0;
 
-				auto iC = 1.0f / (CY1 + CY2 + CY3);
+				auto iC1 = 1.0f / (CY1 + CY2 + CY3);
+				auto iC2 = iC1 * 255.0f;
 
 				for (int iy = y; iy < y + q; ++iy)
 				{
@@ -575,18 +609,18 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 							{
 								if (CX1 > 0 && CX2 > 0 && CX3 > 0)
 								{
-									const auto r = (c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC;
-									const auto g = (c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC;
-									const auto b = (c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC;
-									const auto u = (vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC;
-									const auto v = (vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC;
+									const auto r = static_cast<int>((c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC2);
+									const auto g = static_cast<int>((c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC2);
+									const auto b = static_cast<int>((c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC2);
+									const auto u = static_cast<int>((vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC1 * m_lfTextureWidth);
+									const auto v = static_cast<int>((vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC1 * m_lfTextureHeight);
 
-									const auto tx = mymax(0, mymin(static_cast<int>(u * m_nTextureWidth), m_nTextureWidth - 1));
-									const auto ty = mymax(0, mymin(static_cast<int>(v * m_nTextureHeight), m_nTextureHeight - 1));
+									const auto tx = mymax(0, mymin(u, m_nTextureWidth - 1));
+									const auto ty = mymax(0, mymin(v, m_nTextureHeight - 1));
 
-									const auto a = (c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC * m_pImGuiTexture[tx + ty * m_nTextureWidth];
+									const auto a = static_cast<int>((c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC1 * m_pImGuiTexture[tx + ty * m_nTextureWidth]);
 
-									BlendColor(ix, iy, static_cast<int>(r*255), static_cast<int>(g*255), static_cast<int>(b*255), static_cast<int>(a));
+									BlendColor(ix, iy, r, g, b, a);
 									bDrawed = true;
 								}
 							}

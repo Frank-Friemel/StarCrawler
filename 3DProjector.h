@@ -57,6 +57,95 @@ protected:
 	void NewFrameImGui();
 	void RenderImGui();
 
+	BEGIN_MSG_MAP_EX(C3DProjector)
+		switch (uMsg)
+		{
+			case WM_LBUTTONDOWN:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[0] = true;
+			}
+			break;
+			
+			case WM_LBUTTONDBLCLK:
+			{
+				++m_bDoubleClick;
+			}
+			break;
+			case WM_LBUTTONUP:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[0] = false;
+			}
+			break;
+			case WM_RBUTTONDOWN:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[1] = true;
+			}
+			break;
+			case WM_RBUTTONUP:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[1] = false;
+			}
+			break;
+			case WM_MBUTTONDOWN:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[2] = true;
+			}
+			break;
+			case WM_MBUTTONUP:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseDown[2] = false;
+			}
+			break;
+			case WM_MOUSEWHEEL:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MouseWheel += GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? +1.0f : -1.0f;
+			}
+			break;
+			case WM_MOUSEMOVE:
+			{
+				ImGuiIO& io = ImGui::GetIO();
+				io.MousePos.x = (signed short)(lParam);
+				io.MousePos.y = (signed short)(lParam >> 16);
+			}
+			break;
+			case WM_KEYDOWN:
+			{
+				if (wParam < 256)
+				{
+					ImGuiIO& io = ImGui::GetIO();
+					io.KeysDown[wParam] = 1;
+				}			
+			}
+			break;
+			case WM_KEYUP:
+			{
+				if (wParam < 256)
+				{
+					ImGuiIO& io = ImGui::GetIO();
+					io.KeysDown[wParam] = 0;
+				}			
+			}
+			break;
+			case WM_CHAR:
+			{
+				// You can also use ToAscii()+GetKeyboardState() to retrieve characters.
+				if (wParam > 0 && wParam < 0x10000)
+				{	
+					ImGuiIO& io = ImGui::GetIO();
+					io.AddInputCharacter((unsigned short)wParam);
+				}
+			}
+			break;
+		}
+	END_MSG_MAP()
+
 public:
 	// implementation
 	virtual void	PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha) = 0;
@@ -91,19 +180,24 @@ protected:
 	glm::dvec4			m_c;	// cam 
 	glm::dvec4			m_e;	// viewer
 	
-	unsigned char*		m_pImGuiTexture;
+	CTempBuffer<float>	m_pImGuiTexture;
 	int					m_nTextureWidth;
 	int					m_nTextureHeight;
+	float				m_lfTextureWidth;
+	float				m_lfTextureHeight;
 	LARGE_INTEGER		m_ImGuiPrevTime;
 	float				m_TicksPerSecond;
 	CRect				m_rectClip;
 	bool				m_bClip;
 
-public:
+protected:
 	glm::dmat4			m_matCamView;
 
 protected:
 	unsigned char*		m_pCurrentFrameBuffer;
+
+private:
+	interlocked_t		m_bDoubleClick;
 
 };
 
