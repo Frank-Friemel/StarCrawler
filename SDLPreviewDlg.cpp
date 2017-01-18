@@ -24,12 +24,25 @@
 #define STAR_FIELD_DISTANCE			(-80.0)
 #define FADEOUT_MARKER_PERCENT		(90)		// begin to fade out scene at 90%
 
+
+CSDLPreviewDlg::frame_buffer_t::frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount)
+{
+	sz.cx = nWidth;
+	sz.cy = nHeight;
+
+	bits  = nBitplaneCount * 8;
+
+	ATLVERIFY(SUCCEEDED(CreateDibmap(NULL, &sz, bits, (void**)&m_pFrameBuffer, &hbmp)));
+}
+
+CSDLPreviewDlg::frame_buffer_t::~frame_buffer_t()
+{
+	if (hbmp)
+		DeleteObject(hbmp);
+}
+
 CSDLPreviewDlg::CSDLPreviewDlg()
 {
-	m_pSDLWindow			= NULL;
-	m_pSDLRenderer			= NULL;
-	m_pSDLTexture			= NULL;
-
 	m_nWidth				= 1280;
 	m_nHeight				= 720;
 	m_lfViewAngle			= 20;
@@ -77,16 +90,6 @@ void CSDLPreviewDlg::CloseSDL()
 
 		::WaitForSingleObject(m_hAudioDecoder, INFINITE);
 		m_hAudioDecoder.Close();
-	}
-	if (m_pSDLWindow)
-	{
-		SDL_DestroyWindow(m_pSDLWindow);
-		SDL_DestroyRenderer(m_pSDLRenderer);
-		SDL_DestroyTexture(m_pSDLTexture);
-
-		m_pSDLWindow	= NULL;
-		m_pSDLRenderer	= NULL;
-		m_pSDLTexture	= NULL;
 	}
 }
 
@@ -167,19 +170,12 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 		CSimpleString strTitle(CAtlStringMgr::GetInstance());
 		this->GetWindowText(strTitle);
 
-		m_pSDLWindow = SDL_CreateWindowFrom(m_hWnd);
-
-		SDL_SetWindowTitle(m_pSDLWindow, T2CA(strTitle));
-		SDL_SetWindowSize(m_pSDLWindow, m_nWidth, m_nHeight);
-		SDL_ShowWindow(m_pSDLWindow);
+		SetWindowPos(NULL, 0, 0, m_nWidth, m_nHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
 		InitImGui(m_hWnd);
 
 		// center the dialog on the screen
 		CenterWindow(GetParent());
-
-		m_pSDLRenderer	= SDL_CreateRenderer(m_pSDLWindow, -1, SDL_RENDERER_ACCELERATED);
-		m_pSDLTexture	= SDL_CreateTexture(m_pSDLRenderer, SDL_PIXELFORMAT_BGR888, SDL_TEXTUREACCESS_STREAMING, m_nWidth, m_nHeight);
 
 		if (m_bWithAudio)
 		{
@@ -401,7 +397,7 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 		// pre load input queue with 2 frame buffers
 		for (int i = 0; i < 2; ++i)
 		{
-			pFrameBuffer = std::make_shared<frame_buffer_t>(m_nWidth * m_nHeight * m_nBitPlaneCount);
+			pFrameBuffer = std::make_shared<frame_buffer_t>(m_nWidth, m_nHeight, m_nBitPlaneCount);
 			m_qInput.queue(pFrameBuffer);
 		}
 		// build frame buffers in worker thread
@@ -584,12 +580,15 @@ void CSDLPreviewDlg::OnTimer(UINT_PTR)
 				{
 					CAudioPlayer::Play();
 				}
-				// let SDL render the frame buffer
-				SDL_UpdateTexture(m_pSDLTexture, nullptr, *pFrameBuffer, m_nStride);
+				// let DC render the frame buffer
+				CClientDC dcDest(m_hWnd);
 
-				SDL_RenderClear(m_pSDLRenderer);
-				SDL_RenderCopy(m_pSDLRenderer, m_pSDLTexture, nullptr, nullptr);
-				SDL_RenderPresent(m_pSDLRenderer);
+				CDC dcSrc(::CreateCompatibleDC(dcDest));
+				ATLASSERT(dcSrc.m_hDC != NULL);
+				HBITMAP hBmpOld = dcSrc.SelectBitmap(pFrameBuffer->hbmp);
+				
+				dcDest.BitBlt(0, 0, m_nWidth, m_nHeight, dcSrc, 0, 0, SRCCOPY);
+				dcSrc.SelectBitmap(hBmpOld);
 			}
 			if (m_nFrameCounter >= m_nFramesTotal)
 			{
@@ -685,8 +684,8 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 
 	if (m_nBitPlaneCount == 4)
 	{
-		agg::pixfmt_rgba32						pixf(rbuf);
-		agg::renderer_base<agg::pixfmt_rgba32>	ren(pixf);
+		agg::pixfmt_bgra32						pixf(rbuf);
+		agg::renderer_base<agg::pixfmt_bgra32>	ren(pixf);
 
 		if (m_bClip)
 			ren.clip_box(m_rectClip.left, m_rectClip.top, m_rectClip.right, m_rectClip.bottom);

@@ -27,6 +27,8 @@ HANDLE			Exec(LPCTSTR strCmd, DWORD dwWait = INFINITE, bool bStdInput = false, H
 std::wstring	GetModulePath(HMODULE hModule = NULL, PCWSTR strModuleName = NULL);
 std::wstring	LocateModulePath(PCWSTR strModule, PCWSTR strDefaultExtension = L".exe");
 bool			WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight);
+void			InitBitmapInfo(__out_bcount(cbInfo) BITMAPINFO *pbmi, ULONG cbInfo, LONG cx, LONG cy, WORD bpp, bool bFlip = true);
+HRESULT			CreateDibmap(HDC hdc, const SIZE *psize, int nBits, __deref_opt_out void **ppvBits, __out HBITMAP* phBmp, bool bFlip = true);
 
 ///////////////////////////////////////////////////////////////////////
 // CAutoSync

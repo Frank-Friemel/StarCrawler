@@ -35,7 +35,7 @@ public:
 		m_colG	= g;
 		m_colB	= b;
 	}
-	inline glm::dvec3 GetBoundingBox() const
+	virtual glm::dvec3 GetBoundingBox() const
 	{
 		glm::dvec3 r(1);
 		return r;

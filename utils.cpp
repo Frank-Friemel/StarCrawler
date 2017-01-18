@@ -549,4 +549,39 @@ ULONGLONG Shovel(HANDLE hFrom, HANDLE hTo, ULONGLONG nBytesToShovel, bool bInput
 	return nBytesToShovel - n;
 }
 
+void InitBitmapInfo(__out_bcount(cbInfo) BITMAPINFO *pbmi, ULONG cbInfo, LONG cx, LONG cy, WORD bpp, bool bFlip /* = true */)
+{
+	ZeroMemory(pbmi, cbInfo);
+
+	pbmi->bmiHeader.biSize			= sizeof(BITMAPINFOHEADER);
+	pbmi->bmiHeader.biPlanes		= 1;
+	pbmi->bmiHeader.biCompression	= BI_RGB;
+	pbmi->bmiHeader.biWidth			= cx;
+	pbmi->bmiHeader.biHeight		= cy * (bFlip ? (-1) : (1));
+	pbmi->bmiHeader.biBitCount		= bpp;
+}
+
+HRESULT CreateDibmap(HDC hdc, const SIZE *psize, int nBits, __deref_opt_out void **ppvBits, __out HBITMAP* phBmp, bool bFlip /* = true */)
+{
+	*phBmp = NULL;
+
+	BITMAPINFO bmi;
+
+	InitBitmapInfo(&bmi, sizeof(bmi), psize->cx, psize->cy, nBits, bFlip);
+
+	HDC hdcUsed = hdc ? hdc : GetDC(NULL);
+
+	if (hdcUsed)
+	{
+		*phBmp = CreateDIBSection(hdcUsed, &bmi, DIB_RGB_COLORS, ppvBits, NULL, 0);
+
+		if (hdc != hdcUsed)
+		{
+			ReleaseDC(NULL, hdcUsed);
+		}
+	}
+	return (NULL == *phBmp) ? E_OUTOFMEMORY : S_OK;
+}
+
+
 }

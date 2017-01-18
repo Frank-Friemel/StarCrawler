@@ -93,9 +93,6 @@ private:
 	double												m_lfScrollSpeed;
 	double												m_lfFlightSpeed;
 	CProgressBarCtrl									m_ctlProgress;
-	SDL_Window*											m_pSDLWindow;
-	SDL_Renderer*										m_pSDLRenderer;
-	SDL_Texture*										m_pSDLTexture;
 
 	int													m_nBitPlaneCount;
 	interlocked_t										m_nFrameCounter;
@@ -113,7 +110,22 @@ private:
 	std::list< shared_ptr<C3DWord> >					m_listWords;
 	std::list< shared_ptr<C3DStar> >					m_listStars;
 
-	typedef  CTempBuffer<uint8_t>  frame_buffer_t;
+	class frame_buffer_t
+	{
+	public:
+		frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount);
+		~frame_buffer_t();
+
+		operator unsigned char *()
+		{
+			return m_pFrameBuffer;
+		}
+	public:
+		SIZE		sz;
+		int			bits;
+		HBITMAP		hbmp;
+		BYTE*		m_pFrameBuffer;
+	};
 
 	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qInput;
 	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qOutput;
