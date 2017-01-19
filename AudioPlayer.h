@@ -24,6 +24,9 @@ public:
 	void	Play();
 	void	Pause();
 
+	void		Mute(bool bMute);
+	bool		IsMuted() const;
+		
 	static void FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, double lfVolume);
 
 public:

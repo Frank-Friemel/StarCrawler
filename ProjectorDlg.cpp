@@ -1054,6 +1054,16 @@ void CProjectorDlg::RenderImGui()
 				SetFlightSpeed((UINT)nFlightSpeed);
 			}
 			ImGui::PopItemWidth();
+
+			if (m_hAudioDecoder)
+			{
+				bool bMute = CAudioPlayer::IsMuted();
+
+				if (ImGui::Checkbox("Mute", &bMute))
+				{
+					CAudioPlayer::Mute(bMute);
+				}
+			}
 		}
 		else
 		{

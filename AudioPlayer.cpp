@@ -64,7 +64,7 @@ public:
 	{
 		return m_bPaused;
 	}
-	void		Mute();
+	void		Mute(bool bMute);
 	inline bool IsMuted() const
 	{
 		return m_bMuted;
@@ -409,9 +409,9 @@ void CWavePlayThread::Pause()
 	}
 }
 
-void CWavePlayThread::Mute()
+void CWavePlayThread::Mute(bool bMute)
 {
-	m_bMuted = !m_bMuted;
+	m_bMuted = bMute;
 }
 
 void CWavePlayThread::SetVolume(WORD wVolume)
@@ -441,6 +441,19 @@ CAudioPlayer::CAudioPlayer()
 CAudioPlayer::~CAudioPlayer()
 {
 	Close();
+}
+
+void CAudioPlayer::Mute(bool bMute)
+{
+	if (m_threadWavePlay)
+		m_threadWavePlay->Mute(bMute);
+}
+
+bool CAudioPlayer::IsMuted() const
+{
+	if (m_threadWavePlay)
+		return m_threadWavePlay->IsMuted();
+	return false;
 }
 
 bool CAudioPlayer::Init(HANDLE hDataSource)
