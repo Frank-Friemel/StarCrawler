@@ -86,13 +86,14 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;STRICT;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;..\SDL2-2.0.5\include;.\agg\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;.\agg\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SDL2.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\SDL2-2.0.5\VisualC\Win32\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
     </Link>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -121,13 +122,14 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WINDOWS;STRICT;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;..\SDL2-2.0.5\include;.\agg\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;.\agg\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SDL2.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\SDL2-2.0.5\VisualC\x64\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
     </Link>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -153,14 +155,15 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <DebugInformationFormat />
       <PreprocessorDefinitions>WIN32;_WINDOWS;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;..\SDL2-2.0.5\include;.\agg\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;.\agg\include</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>SDL2.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\SDL2-2.0.5\VisualC\Win32\Release</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
     </Link>
     <ResourceCompile>
@@ -196,7 +199,7 @@
       <ExceptionHandling>Sync</ExceptionHandling>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <PreprocessorDefinitions>_WINDOWS;STRICT;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;..\SDL2-2.0.5\include;.\agg\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;.\agg\include</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
@@ -204,7 +207,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>SDL2.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>..\SDL2-2.0.5\VisualC\x64\Release</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
     </Link>
     <ResourceCompile>
@@ -233,6 +237,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="3DGlyph.cpp" />
+    <ClCompile Include="3DModel.cpp" />
     <ClCompile Include="3DObject.cpp" />
     <ClCompile Include="3DProjector.cpp" />
     <ClCompile Include="3DStar.cpp" />
@@ -256,7 +261,7 @@
     <ClCompile Include="imgui\imgui_draw.cpp" />
     <ClCompile Include="StarCrawler.cpp" />
     <ClCompile Include="MainDlg.cpp" />
-    <ClCompile Include="SDLPreviewDlg.cpp" />
+    <ClCompile Include="ProjectorDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -267,6 +272,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="3DGlyph.h" />
+    <ClInclude Include="3DModel.h" />
     <ClInclude Include="3DObject.h" />
     <ClInclude Include="3DProjector.h" />
     <ClInclude Include="3DStar.h" />
@@ -278,7 +284,7 @@
     <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="MainDlg.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="SDLPreviewDlg.h" />
+    <ClInclude Include="ProjectorDlg.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>

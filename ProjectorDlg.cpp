@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "SDLPreviewDlg.h"
+#include "ProjectorDlg.h"
 
 #include "agg_pixfmt_rgba.h"
 #include "agg_pixfmt_rgb.h"
@@ -25,7 +25,7 @@
 #define FADEOUT_MARKER_PERCENT		(90)		// begin to fade out scene at 90%
 
 
-CSDLPreviewDlg::frame_buffer_t::frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount)
+CProjectorDlg::frame_buffer_t::frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount)
 {
 	sz.cx = nWidth;
 	sz.cy = nHeight;
@@ -35,13 +35,13 @@ CSDLPreviewDlg::frame_buffer_t::frame_buffer_t(int nWidth, int nHeight, int nBit
 	ATLVERIFY(SUCCEEDED(CreateDibmap(NULL, &sz, bits, (void**)&m_pFrameBuffer, &hbmp)));
 }
 
-CSDLPreviewDlg::frame_buffer_t::~frame_buffer_t()
+CProjectorDlg::frame_buffer_t::~frame_buffer_t()
 {
 	if (hbmp)
 		DeleteObject(hbmp);
 }
 
-CSDLPreviewDlg::CSDLPreviewDlg()
+CProjectorDlg::CProjectorDlg()
 {
 	m_nWidth				= 1280;
 	m_nHeight				= 720;
@@ -78,11 +78,11 @@ CSDLPreviewDlg::CSDLPreviewDlg()
 }
 
 
-CSDLPreviewDlg::~CSDLPreviewDlg()
+CProjectorDlg::~CProjectorDlg()
 {
 }
 
-void CSDLPreviewDlg::CloseSDL()
+void CProjectorDlg::CloseSDL()
 {
 	if (m_hAudioDecoder)
 	{
@@ -93,7 +93,7 @@ void CSDLPreviewDlg::CloseSDL()
 	}
 }
 
-void CSDLPreviewDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
+void CProjectorDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
 {
 	if (dwLen)
 	{
@@ -120,29 +120,33 @@ void CSDLPreviewDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
 				dwReadTotal += dwRead;
 			}
 		}
-		if (dwReadTotal)
+		if (m_nProgress > FADEOUT_MARKER_PERCENT && (dwReadTotal && dwReadTotal % SAMPLE_FACTOR == 0))
 		{
-			if (m_nProgress > FADEOUT_MARKER_PERCENT)
-			{
-				// fade sound after we've reached 90%
-				int nVolume = (int)(((double)SDL_MIX_MAXVOLUME) * ((100 - m_nProgress) / 10.0));
+			// fade sound after we've reached 90%
+			double lfVolume = (100.0 - m_nProgress) / 10.0;
 
-				if (nVolume > SDL_MIX_MAXVOLUME)
-					nVolume = SDL_MIX_MAXVOLUME;
-				if (nVolume < 0)
-					nVolume = 0;
+			short*		sample_in			= (short*)(BYTE*)buf;
+			short*		sample_out			= (short*)pStream;
 
-				SDL_MixAudio(pStream, buf, dwReadTotal, nVolume);
-			}
-			else
+			dwReadTotal /= SAMPLE_FACTOR;
+
+			do
 			{
-				memcpy(pStream, buf, dwReadTotal);
-			}
+				for (auto i = 0; i < NUM_CHANNELS; ++i)
+				{
+					*sample_out++ = (short) (((double)*sample_in++) * lfVolume);
+				}
+			}				
+			while (--dwReadTotal);
+		}
+		else
+		{
+			memcpy(pStream, buf, dwReadTotal);
 		}
 	}
 }
 
-LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
+LRESULT CProjectorDlg::OnInitDialog(HWND, LPARAM)
 {
 	USES_CONVERSION;
 
@@ -414,7 +418,7 @@ LRESULT CSDLPreviewDlg::OnInitDialog(HWND, LPARAM)
 	return TRUE;
 }
 
-void CSDLPreviewDlg::OnClose(UINT, int wID, HWND)
+void CProjectorDlg::OnClose(UINT, int wID, HWND)
 {
 	KillTimer(TIMER_ID);
 	CMyThread::Stop();
@@ -441,7 +445,7 @@ void CSDLPreviewDlg::OnClose(UINT, int wID, HWND)
 	EndDialog(wID);
 }
 
-void CSDLPreviewDlg::OnEvent()
+void CProjectorDlg::OnEvent()
 {
 	// this worker thread constructs the frames
 	std::shared_ptr<frame_buffer_t> pFrameBuffer;
@@ -542,7 +546,7 @@ void CSDLPreviewDlg::OnEvent()
 	}
 }
 
-void CSDLPreviewDlg::OnTimer(UINT_PTR)
+void CProjectorDlg::OnTimer(UINT_PTR)
 {
 	// the main thread displays the constructed frames
 	if (m_nFrameCounter < m_nFramesTotal)
@@ -613,7 +617,7 @@ void CSDLPreviewDlg::OnTimer(UINT_PTR)
 	}
 }
 
-void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha)
+void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha)
 {
 	// beautiful agg polygon rendering ....
 	agg::path_storage ps;
@@ -704,7 +708,7 @@ void CSDLPreviewDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t 
 	}
 }
 
-bool CSDLPreviewDlg::CreateScene()
+bool CProjectorDlg::CreateScene()
 {
 	srand(m_nRandSeed);
 
@@ -785,7 +789,7 @@ bool CSDLPreviewDlg::CreateScene()
 	return true;
 }
 
-void CSDLPreviewDlg::AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::dvec3& posLeftBorder, const glm::dvec3& posRightBorder, const glm::dvec3& boundsSpace, double lfVOffsetFactor /*= 1.5*/)
+void CProjectorDlg::AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::dvec3& posLeftBorder, const glm::dvec3& posRightBorder, const glm::dvec3& boundsSpace, double lfVOffsetFactor /*= 1.5*/)
 {
 	strTextBlock += L"\n";
 
@@ -886,7 +890,7 @@ void CSDLPreviewDlg::AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::
 	}
 }
 
-void CSDLPreviewDlg::MoveScene(int nSteps /* = 1*/)
+void CProjectorDlg::MoveScene(int nSteps /* = 1*/)
 {
 	if (nSteps < 0)
 	{
@@ -929,7 +933,7 @@ void CSDLPreviewDlg::MoveScene(int nSteps /* = 1*/)
 	}
 }
 
-void CSDLPreviewDlg::PlayPause()
+void CProjectorDlg::PlayPause()
 {
 	m_bPaused = !m_bPaused;
 
@@ -943,7 +947,7 @@ void CSDLPreviewDlg::PlayPause()
 	}
 }
 
-void CSDLPreviewDlg::RenderImGui()
+void CProjectorDlg::RenderImGui()
 {
 	ATLASSERT(!m_bExportMode && m_bHeadupDisplay);
 

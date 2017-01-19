@@ -83,7 +83,7 @@ typedef CAutoSyncT<CCriticalSection> CAutoSync;
 // CMyQueue
 
 template<class T>
-class CMyQueue : protected std::list<T>
+class CMyQueue : public std::list<T>
 {
 public:
 	CMyQueue()
@@ -152,11 +152,20 @@ public:
 		__super::clear();
 		m_bCanQueue = true;
 	}
+	inline void Lock(bool bExcusive = true)
+	{
+		UNREFERENCED_PARAMETER(bExcusive);
+		m_mtx.Enter();
+	}
+	inline void Unlock()
+	{
+		m_mtx.Leave();
+	}
 public:
-	CEvent					m_hEvent;
+	CEvent							m_hEvent;
 protected:
-	CCriticalSection		m_mtx;
-	bool					m_bCanQueue;
+	mutable CCriticalSection		m_mtx;
+	bool							m_bCanQueue;
 };
 
 

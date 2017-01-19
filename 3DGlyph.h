@@ -1,8 +1,8 @@
 #pragma once
 
-#include "3DObject.h"
+#include "3DModel.h"
 
-class C3DGlyph : public C3DObject
+class C3DGlyph : public C3DModel
 {
 public:
 	C3DGlyph();
@@ -10,12 +10,7 @@ public:
 
 	bool Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted = false);
 
-	virtual void Clear();
-	virtual void Draw(C3DProjector* pProjector);
+	virtual glm::dvec3 GetBoundingBox() const;
 
-	glm::dvec3 GetBoundingBox() const;
-
-private:
-	vector<face_t>				m_vecFaces;
 };
 

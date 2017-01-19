@@ -7,7 +7,7 @@
 #include "3DProjector.h"
 #include "3DObject.h"
 
-class CSDLPreviewDlg;
+class CProjectorDlg;
 
 
 class CMainDlg : public CDialogImpl<CMainDlg>
@@ -45,5 +45,5 @@ private:
 	void ParametersToControls();
 
 private:
-	CSDLPreviewDlg* m_pPreviewDlg;
+	CProjectorDlg* m_pProjectorDlg;
 };

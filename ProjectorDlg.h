@@ -10,11 +10,11 @@ class C3DStar;
 #include "3DProjector.h"
 #include "AudioPlayer.h"
 
-class CSDLPreviewDlg : public CDialogImpl<CSDLPreviewDlg>, public C3DProjector, protected CMyThread, protected CAudioPlayer
+class CProjectorDlg : public CDialogImpl<CProjectorDlg>, public C3DProjector, protected CMyThread, protected CAudioPlayer
 {
 public:
-	CSDLPreviewDlg();
-	~CSDLPreviewDlg();
+	CProjectorDlg();
+	~CProjectorDlg();
 
 	enum { IDD = IDD_PREVIEW };
 

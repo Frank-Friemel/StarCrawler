@@ -50,7 +50,6 @@ using namespace std;
 #include "glm\gtx\transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
-#include "SDL.h"
 #include "utils.h"
 
 using namespace local_utils;

@@ -51,9 +51,6 @@
     <ClCompile Include="3DProjector.cpp">
       <Filter>Source Files\3D</Filter>
     </ClCompile>
-    <ClCompile Include="SDLPreviewDlg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="agg\agg_arc.cpp">
       <Filter>Source Files\agg</Filter>
     </ClCompile>
@@ -102,6 +99,12 @@
     <ClCompile Include="imgui\imgui_draw.cpp">
       <Filter>Source Files\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="3DModel.cpp">
+      <Filter>Source Files\3D</Filter>
+    </ClCompile>
+    <ClCompile Include="ProjectorDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -118,9 +121,6 @@
     </ClInclude>
     <ClInclude Include="3DProjector.h">
       <Filter>Header Files\3D</Filter>
-    </ClInclude>
-    <ClInclude Include="SDLPreviewDlg.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="agg\include\agg_pixfmt_rgba.h">
       <Filter>Header Files\agg</Filter>
@@ -148,6 +148,12 @@
     </ClInclude>
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="3DModel.h">
+      <Filter>Header Files\3D</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectorDlg.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

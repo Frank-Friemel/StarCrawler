@@ -21,52 +21,10 @@ C3DGlyph::~C3DGlyph()
 {
 }
 
-void C3DGlyph::Clear()
-{
-	__super::Clear();
-	m_vecFaces.clear();
-}
-
 glm::dvec3  C3DGlyph::GetBoundingBox() const
 {
 	ATLASSERT(!m_vecVertices.empty());
 	return m_vecVertices[1] - m_vecVertices[0];
-}
-
-void C3DGlyph::Draw(C3DProjector* pProjector)
-{
-	ATLASSERT(pProjector);
-
-	vector<PIXEL2D>	vecPoints(m_vecVertices.size());
-
-	size_t i = 0;
-
-	bool bIsVisible = false;
-
-	for each(auto& v in m_vecVertices)
-	{
-		pProjector->VertexToPixel(v, vecPoints[i]);
-
-		if (!bIsVisible && pProjector->IsVisible(vecPoints[i]))
-			bIsVisible = true;
-		++i;
-	}
-	if (bIsVisible)
-	{
-		size_t n = m_vecFaces.size();
-
-		vector<PIXEL2D>	vecPolyPoints(n);
-		vector<BYTE>	vecPolyTypes(n);
-
-		i = 0;
-
-		for each(auto&f in m_vecFaces)
-		{
-			vecPolyPoints[i] = vecPoints[f.first];
-			vecPolyTypes[i++] = f.second;
-		}
-		pProjector->PolyDraw(&vecPolyPoints.front(), &vecPolyTypes.front(), n, m_colR, m_colG, m_colB, m_alpha);
-	}
 }
 
 bool C3DGlyph::Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted /*= false*/)

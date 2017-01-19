@@ -22,19 +22,9 @@ int WINAPI _tWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPTSTR /*
 	hRes = _Module.Init(NULL, hInstance);
 	ATLASSERT(SUCCEEDED(hRes));
 
-	int nRet = 0;
-
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) >= 0)
-	{
-		CMainDlg dlgMain;
-		nRet = (int) dlgMain.DoModal();
-
-		SDL_Quit();
-	}
-	else
-	{
-		::MessageBox(NULL, L"Failed to initialize SDL", L"Error", MB_OK|MB_ICONEXCLAMATION);
-	}
+	CMainDlg dlgMain;
+	
+	int nRet = (int) dlgMain.DoModal();
 
 	_Module.Term();
 	::CoUninitialize();
