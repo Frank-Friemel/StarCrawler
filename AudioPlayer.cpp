@@ -4,6 +4,7 @@
 
 #pragma comment(lib, "Winmm.lib")
 
+
 ////////////////////////////////////////////////////////////////
 // CWaveQueueItem
 
@@ -31,7 +32,7 @@ public:
 	bool Prepare(HWAVEOUT hWaveOut);
 	void UnPrepare(HWAVEOUT hWaveOut);
 	bool Play(HWAVEOUT hWaveOut);
-	void WaitPlayed();
+	void WaitIfPlayed();
 	void Mute();
 
 public:
@@ -46,7 +47,7 @@ private:
 ///////////////////////////////////////////////////////////
 // CWavePlayThread
 
-class CWavePlayThread : public CMyThread
+class CWavePlayThread : protected CMyThread
 {
 public:
 	typedef std::function<void(BYTE* pStream, ULONG dwLen)>	callback_t;
@@ -151,7 +152,7 @@ bool CWaveQueueItem::Play(HWAVEOUT hWaveOut)
 	return false;
 }
 
-void CWaveQueueItem::WaitPlayed()
+void CWaveQueueItem::WaitIfPlayed()
 {
 	if (m_bPlayed)
 	{
@@ -243,6 +244,7 @@ bool CWavePlayThread::Start(callback_t callback, size_t nThreshold /*= 16*/)
 
 	ATLASSERT(m_callback);
 
+	// create a manual reset event
 	ATLASSERT(!m_hStarted);
 	m_hStarted.Attach(::CreateEvent(NULL, TRUE, FALSE, NULL));
 	
@@ -250,8 +252,10 @@ bool CWavePlayThread::Start(callback_t callback, size_t nThreshold /*= 16*/)
 
 	if (__super::Start(hEvent))
 	{
+		// sync with OnStart
 		::WaitForSingleObject(m_hStarted, INFINITE);
 
+		// succeeded?
 		bResult = m_hWaveOut != NULL ? true : false;
 
 		if (!bResult)
@@ -282,6 +286,7 @@ bool CWavePlayThread::OnStart()
 	}
 	else
 	{
+		// suspend player, so we can control when to start
 		if (waveOutPause(m_hWaveOut) == MMSYSERR_NOERROR)
 		{
 			::ResetEvent(m_hEvent);
@@ -289,7 +294,9 @@ bool CWavePlayThread::OnStart()
 		}
 		else
 		{
+			// unexpected
 			ATLASSERT(FALSE);
+			::SetEvent(m_hEvent);
 		}
 		bResult = true;
 
@@ -307,13 +314,15 @@ void CWavePlayThread::OnStop()
 {
 	if (m_hWaveOut)
 	{
+		// waveOutReset will abort all queued items
 		ATLVERIFY(waveOutReset(m_hWaveOut) == MMSYSERR_NOERROR);
 
 		std::shared_ptr<CWaveQueueItem> pItem;
 
+		// wait for abortion to complete
 		while(m_Queue.unqueue(pItem))
 		{
-			pItem->WaitPlayed();
+			pItem->WaitIfPlayed();
 			pItem->UnPrepare(m_hWaveOut);
 			pItem.reset();
 		}
@@ -383,6 +392,7 @@ void CWavePlayThread::Pause()
 		{
 			m_bPaused = false;
 
+			// signal worker thread to fill the queue
 			::SetEvent(m_hEvent);
 			Sleep(0);
 
@@ -392,8 +402,8 @@ void CWavePlayThread::Pause()
 		{
 			if (waveOutPause(m_hWaveOut) == MMSYSERR_NOERROR)
 			{
-				::ResetEvent(m_hEvent);
 				m_bPaused = true;
+				::ResetEvent(m_hEvent);
 			}
 		}
 	}
@@ -475,9 +485,10 @@ void CAudioPlayer::Close()
 	if (m_threadWavePlay)
 	{
 		m_threadWavePlay->Stop();
-		m_hAudioData.Close();
 		m_threadWavePlay.reset();
 	}
+	if (m_hAudioData)
+		m_hAudioData.Close();
 }
 
 void  CAudioPlayer::FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, double lfVolume)
