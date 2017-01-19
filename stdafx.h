@@ -12,6 +12,8 @@
 
 #include <SDKDDKVer.h>
 
+#include <math.h>
+
 #include <atlbase.h>
 #include <atlapp.h>
 
@@ -43,6 +45,7 @@ extern CAppModule _Module;
 #include <memory>
 #include <set>
 #include <array>
+#include <functional>
 
 using namespace std;
 

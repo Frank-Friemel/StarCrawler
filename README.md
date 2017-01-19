@@ -6,7 +6,6 @@ This is more a **Demo** than a serious piece of software. Shows how to:
 * use Windows API routine _GetGlyphOutline_
 * project 3D objects to a 2D bitplane by CPU (not GPU)
 * use `dear imgui` to render a Headup Display with controls
-* use SDL to present a raw bitplane on screen
 * play encoded (e.g. MP3) audio tracks in realtime
 * export a slideshow of images to MP4 video
 
@@ -14,7 +13,6 @@ Download pre compiled binaries from [`Releases`](https://github.com/Frank-Frieme
 
 ### Third party libraries
 * [`WTL`](https://sourceforge.net/projects/wtl) Windows Template Library
-* [`SDL`](https://www.libsdl.org/) Simple Directmedia Layer
 * [`GLM`](http://glm.g-truc.net) OpenGL Mathematics
 
 Already included within this project is [Anti-Grain Geometry](http://www.antigrain.com) and [dear imgui](https://github.com/ocornut/imgui). `dear imgui` code is licensed under MIT license.

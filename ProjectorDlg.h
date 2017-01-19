@@ -33,10 +33,10 @@ public:
 protected:
 	virtual void PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha);
 	virtual void OnEvent();
-	virtual void OnPlayAudio(BYTE* pStream, DWORD dwLen);
+	virtual void OnPlayAudio(BYTE* pStream, ULONG dwLen);
 
 private:
-	void	CloseSDL();
+	void	StopAudio();
 	bool	CreateScene();
 	void	MoveScene(int nSteps = 1);
 	void	PlayPause();

@@ -31,6 +31,30 @@ void			InitBitmapInfo(__out_bcount(cbInfo) BITMAPINFO *pbmi, ULONG cbInfo, LONG 
 HRESULT			CreateDibmap(HDC hdc, const SIZE *psize, int nBits, __deref_opt_out void **ppvBits, __out HBITMAP* phBmp, bool bFlip = true);
 
 ///////////////////////////////////////////////////////////////////////
+// CDummyLock
+
+class CDummyLock
+{
+public:
+	// Acquire the critical section
+	_Acquires_lock_(*this)
+	void Enter()
+	{
+	}
+	// Release the critical section
+	_Releases_lock_(*this)
+	void Leave()
+	{
+	}
+	// Attempt to acquire the critical section
+	_When_(return != 0, _Acquires_lock_(*this))
+	BOOL TryEnter()
+	{
+		return TRUE;
+	}
+};
+
+///////////////////////////////////////////////////////////////////////
 // CAutoSync
 
 template<class T>
@@ -82,7 +106,7 @@ typedef CAutoSyncT<CCriticalSection> CAutoSync;
 ///////////////////////////////////////////////////////////////////////
 // CMyQueue
 
-template<class T>
+template<class T, class __LockClass = CCriticalSection>
 class CMyQueue : public std::list<T>
 {
 public:
@@ -94,7 +118,7 @@ public:
 public:
 	inline bool queue(const T& item)
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 
 		if (m_bCanQueue)
 		{
@@ -108,7 +132,7 @@ public:
 	}
 	inline bool unqueue(T& item)
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		
 		if (!__super::empty())
 		{
@@ -118,9 +142,33 @@ public:
 		}
 		return false;
 	}
+	inline bool peek(T& item) const
+	{
+		CAutoSyncT<__LockClass> sync(m_mtx);
+
+		if (!__super::empty())
+		{
+			item = front();
+			return true;
+		}
+		return false;
+	}
+	inline bool unqueue()
+	{
+		CAutoSyncT<__LockClass> sync(m_mtx);
+
+		if (!__super::empty())
+		{
+			T item = front();
+			pop_front();
+			sync.Unlock();
+			return true;
+		}
+		return false;
+	}
 	inline size_t size(void) const
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		return __super::size();
 	}
 	inline size_t count(void) const
@@ -129,12 +177,12 @@ public:
 	}
 	inline bool is_flushed() const
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		return (!m_bCanQueue && _super::empty()) ? true : false;
 	}
 	inline void flush()
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		m_bCanQueue = false;
 		sync.Unlock();
 
@@ -142,12 +190,12 @@ public:
 	}
 	inline bool empty() const
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		return __super::empty() ? true : false;
 	}
 	inline void clear()
 	{
-		CAutoSync sync(m_mtx);
+		CAutoSyncT<__LockClass> sync(m_mtx);
 		m_hEvent.Reset();
 		__super::clear();
 		m_bCanQueue = true;
@@ -164,7 +212,7 @@ public:
 public:
 	CEvent							m_hEvent;
 protected:
-	mutable CCriticalSection		m_mtx;
+	mutable __LockClass				m_mtx;
 	bool							m_bCanQueue;
 };
 

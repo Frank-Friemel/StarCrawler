@@ -2,6 +2,10 @@
 #include "3DStar.h"
 #include "3DProjector.h"
 
+#ifndef M_PI
+#define M_PI       3.14159265358979323846   // pi
+#endif
+
 C3DStar::C3DStar()
 {
 }
@@ -9,49 +13,6 @@ C3DStar::C3DStar()
 
 C3DStar::~C3DStar()
 {
-}
-
-void C3DStar::Clear()
-{
-	__super::Clear();
-	m_vecFaces.clear();
-}
-
-void C3DStar::Draw(C3DProjector* pProjector)
-{
-	ATLASSERT(pProjector);
-
-	vector<PIXEL2D>	vecPoints(m_vecVertices.size());
-
-	size_t i = 0;
-
-	bool bIsVisible = false;
-
-	for each(auto& v in m_vecVertices)
-	{
-		pProjector->VertexToPixel(v, vecPoints[i]);
-
-		if (!bIsVisible && pProjector->IsVisible(vecPoints[i]))
-			bIsVisible = true;
-		++i;
-	}
-	if (bIsVisible)
-	{
-		size_t n = m_vecFaces.size();
-
-		vector<PIXEL2D>	vecPolyPoints(n);
-		vector<BYTE>	vecPolyTypes(n);
-
-		i = 0;
-
-		for each(auto&f in m_vecFaces)
-		{
-			vecPolyPoints[i] = vecPoints[f.first];
-			vecPolyTypes[i++] = f.second;
-		}
-		pProjector->PolyDraw(&vecPolyPoints.front(), &vecPolyTypes.front(), n, m_colR, m_colG, m_colB, m_alpha);
-
-	}
 }
 
 void  C3DStar::Randomize(C3DProjector* pProjector, double lfMoveToDistance)

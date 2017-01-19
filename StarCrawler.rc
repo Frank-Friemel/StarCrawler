@@ -243,8 +243,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,3
- PRODUCTVERSION 1,0,0,3
+ FILEVERSION 1,0,0,4
+ PRODUCTVERSION 1,0,0,4
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -260,12 +260,12 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "FileDescription", "StarCrawler Module"
-            VALUE "FileVersion", "1.0.0.3"
+            VALUE "FileVersion", "1.0.0.4"
             VALUE "InternalName", "StarCrawler"
-            VALUE "LegalCopyright", "Copyright Frank Friemel 2016"
+            VALUE "LegalCopyright", "Copyright Frank Friemel 2017"
             VALUE "OriginalFilename", "StarCrawler.exe"
             VALUE "ProductName", "StarCrawler Module"
-            VALUE "ProductVersion", "1.0.0.3"
+            VALUE "ProductVersion", "1.0.0.4"
         END
     END
     BLOCK "VarFileInfo"

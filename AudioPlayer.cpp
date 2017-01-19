@@ -4,6 +4,102 @@
 
 #pragma comment(lib, "Winmm.lib")
 
+////////////////////////////////////////////////////////////////
+// CWaveQueueItem
+
+class CWaveQueueItem
+{
+public:
+	CWaveQueueItem()
+	{
+		m_nLen		= 0;
+		InitNew();
+	}
+	inline bool IsPlayed() const
+	{
+		return m_bPlayed;
+	}
+	inline bool IsDone() const
+	{
+		return m_WaveHeader.dwFlags & WHDR_DONE ? true : false;
+	}
+	inline void InitNew()
+	{
+		memset(&m_WaveHeader, 0, sizeof(m_WaveHeader));
+		m_bPlayed	= false;
+	}
+	bool Prepare(HWAVEOUT hWaveOut);
+	void UnPrepare(HWAVEOUT hWaveOut);
+	bool Play(HWAVEOUT hWaveOut);
+	void WaitPlayed();
+	void Mute();
+
+public:
+	CTempBuffer<BYTE>			m_Blob;
+	ULONG						m_nLen;
+
+private:
+	WAVEHDR						m_WaveHeader;
+	bool						m_bPlayed;
+};
+
+///////////////////////////////////////////////////////////
+// CWavePlayThread
+
+class CWavePlayThread : public CMyThread
+{
+public:
+	typedef std::function<void(BYTE* pStream, ULONG dwLen)>	callback_t;
+
+	CWavePlayThread(UINT nDeviceID = WAVE_MAPPER);
+	~CWavePlayThread();
+
+	void Init(ULONG nFreq = (ULONG)SAMPLE_FREQ, ULONG nChannels = NUM_CHANNELS, ULONG nSampleSizeBits = SAMPLE_SIZE);
+	bool Start(callback_t callback, size_t nThreshold = 16);
+	void Stop();
+
+	void		Pause();
+	inline bool IsPaused() const
+	{
+		return m_bPaused;
+	}
+	void		Mute();
+	inline bool IsMuted() const
+	{
+		return m_bMuted;
+	}
+	void SetVolume(WORD wVolume);
+	WORD GetVolume();
+
+private:
+	bool Alloc(std::shared_ptr<CWaveQueueItem>& pItem);
+	void Free(std::shared_ptr<CWaveQueueItem>& pItem);
+
+protected:
+	virtual bool OnStart();
+	virtual void OnStop();
+	virtual void OnEvent();
+
+protected:
+	HWAVEOUT				m_hWaveOut;
+
+	typedef CMyQueue< std::shared_ptr<CWaveQueueItem>, CDummyLock >	CWaveQueueItemList;
+
+	CWaveQueueItemList		m_Queue;
+	CWaveQueueItemList		m_Pool;
+
+	CHandle					m_hStarted;
+	UINT					m_nDeviceID;
+	size_t					m_nThreshold;
+	volatile bool			m_bPaused;
+	volatile bool			m_bMuted;
+	callback_t				m_callback;
+
+public:
+	WAVEFORMATEX			m_format;
+	UINT					m_nRealDeviceID;
+};
+
 
 /////////////////////////////////////////////////////////////////////////////////
 // CWaveQueueItem
@@ -39,7 +135,7 @@ void CWaveQueueItem::UnPrepare(HWAVEOUT hWaveOut)
 	{
 		while (waveOutUnprepareHeader(hWaveOut, &m_WaveHeader, sizeof(m_WaveHeader)) != MMSYSERR_NOERROR)
 			Sleep(10);
-		memset(&m_WaveHeader, 0, sizeof(m_WaveHeader));
+		InitNew();
 	}
 }
 
@@ -55,6 +151,17 @@ bool CWaveQueueItem::Play(HWAVEOUT hWaveOut)
 	return false;
 }
 
+void CWaveQueueItem::WaitPlayed()
+{
+	if (m_bPlayed)
+	{
+		while (!(m_WaveHeader.dwFlags & WHDR_DONE))
+		{
+			Sleep(10);
+		}
+	}
+}
+
 void  CWaveQueueItem::Mute()
 {
 	memset(m_Blob, 0, m_nLen);
@@ -68,7 +175,7 @@ CWavePlayThread::CWavePlayThread(UINT nDeviceID /*= WAVE_MAPPER*/)
 	m_hWaveOut		= NULL;
 	m_nDeviceID		= nDeviceID;
 	m_nRealDeviceID	= 0;
-	m_nDropSize		= -1;
+	m_nThreshold	= 16;
 	Init();
 	m_bPaused		= false;
 	m_bMuted		= false;
@@ -94,7 +201,7 @@ void CWavePlayThread::Init(ULONG nFreq /*= 44100*/, ULONG nChannels /*= 2*/, ULO
 	m_Pool.clear();
 }
 
-bool CWavePlayThread::Alloc(std::shared_ptr<CWaveQueueItem>& pItem, ULONG nSize)
+bool CWavePlayThread::Alloc(std::shared_ptr<CWaveQueueItem>& pItem)
 {
 	if (pItem)
 		pItem.reset();
@@ -103,34 +210,38 @@ bool CWavePlayThread::Alloc(std::shared_ptr<CWaveQueueItem>& pItem, ULONG nSize)
 
 	if (!pItem)
 	{
-		pItem = std::make_shared<queue_item_type>();
+		pItem = std::make_shared<CWaveQueueItem>();
+
+		if (!pItem)
+			return false;
+
+		pItem->m_nLen = 4096;
+
+		if (!pItem->m_Blob.Allocate(pItem->m_nLen))
+			return false;
 	}
-	if (pItem)
-	{
-		if (pItem->m_Blob.Reallocate(nSize))
-		{
-			pItem->m_nLen = nSize;
-		}
-		else
-		{
-			pItem.reset();
-		}
-	}
-	return pItem ? true : false;
+	memset(pItem->m_Blob, 0, pItem->m_nLen);
+	return true;
 }
 
 void CWavePlayThread::Free(std::shared_ptr<CWaveQueueItem>& pItem)
 {
 	ATLASSERT(pItem);
+	pItem->InitNew();
 	m_Pool.queue(pItem);
 	pItem.reset();
 }
 
-bool CWavePlayThread::Start()
+bool CWavePlayThread::Start(callback_t callback, size_t nThreshold /*= 16*/)
 {
 	if (IsRunning())
 		return true;
 	bool bResult = false;
+
+	m_nThreshold	= nThreshold;
+	m_callback		= callback;
+
+	ATLASSERT(m_callback);
 
 	ATLASSERT(!m_hStarted);
 	m_hStarted.Attach(::CreateEvent(NULL, TRUE, FALSE, NULL));
@@ -154,15 +265,11 @@ bool CWavePlayThread::Start()
 
 void CWavePlayThread::Stop()
 {
-	if (IsPaused())
-		Pause();
 	__super::Stop();
 }
 
 bool CWavePlayThread::OnStart()
 {
-	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_LOWEST);
-
 	bool bResult = false;
 
 	ATLASSERT(m_hWaveOut == NULL);
@@ -175,6 +282,15 @@ bool CWavePlayThread::OnStart()
 	}
 	else
 	{
+		if (waveOutPause(m_hWaveOut) == MMSYSERR_NOERROR)
+		{
+			::ResetEvent(m_hEvent);
+			m_bPaused = true;
+		}
+		else
+		{
+			ATLASSERT(FALSE);
+		}
 		bResult = true;
 
 		if (MMSYSERR_NOERROR != waveOutGetID(m_hWaveOut, &m_nRealDeviceID)) 
@@ -191,111 +307,72 @@ void CWavePlayThread::OnStop()
 {
 	if (m_hWaveOut)
 	{
+		ATLVERIFY(waveOutReset(m_hWaveOut) == MMSYSERR_NOERROR);
+
 		std::shared_ptr<CWaveQueueItem> pItem;
 
-		m_Queue.unqueue(pItem);
-
-		while(pItem)
+		while(m_Queue.unqueue(pItem))
 		{
+			pItem->WaitPlayed();
 			pItem->UnPrepare(m_hWaveOut);
 			pItem.reset();
-
-			m_Queue.unqueue(pItem);
 		}
-
-		m_Pool.unqueue(pItem);
-
-		while(pItem)
-		{
-			pItem->UnPrepare(m_hWaveOut);
-			pItem.reset();
-
-			m_Pool.unqueue(pItem);
-		}
-
+		m_Pool.clear();
 		ATLVERIFY(waveOutClose(m_hWaveOut) == MMSYSERR_NOERROR);
-		m_hWaveOut = NULL;
+		
+		m_hWaveOut	= NULL;
+		m_bPaused	= false;
 	}
-}
-
-bool CWavePlayThread::Play(std::shared_ptr<CWaveQueueItem>& pItem)
-{
-	ATLASSERT(pItem);
-
-	if (m_hWaveOut != NULL)
-	{
-		if (!IsStopping())
-		{
-			if (pItem->Prepare(m_hWaveOut))
-			{
-				m_Queue.Lock(true);
-				::ResetEvent(m_hEvent);
-				m_Queue.push_back(pItem);
-
-				if (!m_bPaused && m_nDropSize >= 0 && m_hDropEvent && m_nDropSize >= (LONG) m_Queue.size())
-				{
-					::SetEvent(m_hDropEvent);
-					m_Queue.Unlock();
-					return true;
-				}
-				if (m_bPaused)
-				{
-					m_Queue.Unlock();
-					return true;
-				}
-				for (auto i = m_Queue.begin(); i != m_Queue.end(); ++i)
-				{
-					if (!(*i)->IsPlayed())
-					{
-						if (m_bMuted)
-						{
-							(*i)->Mute();
-						}
-						(*i)->Play(m_hWaveOut);
-					}
-				}		
-				m_Queue.Unlock();
-				return true;
-			}
-		}
-	}
-	return false;
 }
 
 void CWavePlayThread::OnEvent()
 {
-	DWORD dwSleep = 0;
+	::ResetEvent(m_hEvent);
 
-	m_Queue.Lock(true);
+	std::shared_ptr<CWaveQueueItem> pItem;
 
-	while (!m_Queue.empty())
+	while (m_Queue.peek(pItem))
 	{
-		std::shared_ptr<CWaveQueueItem>& pItem = m_Queue.front();
-
-		if (pItem->m_WaveHeader.dwFlags & WHDR_DONE)
+		if (pItem->IsDone())
 		{
-			std::shared_ptr<CWaveQueueItem> _pItem = pItem;
-			m_Queue.pop_front();
-			m_Queue.Unlock();
-
-			Free(_pItem);
-
-			m_Queue.Lock(true);
+			m_Queue.unqueue();
+			Free(pItem);
 		}
 		else
+		{
+			pItem.reset();
 			break;
+		}
 	}
-	if (!m_bPaused && m_nDropSize >= 0 && m_hDropEvent && m_nDropSize >= (LONG) m_Queue.size())
+	if (!m_bPaused)
 	{
-		::SetEvent(m_hDropEvent);
+		while (m_nThreshold >= m_Queue.size())
+		{
+			if (!Alloc(pItem))
+				break;
+			m_callback(pItem->m_Blob, pItem->m_nLen);
 
-		if (m_Queue.size() == 0)
-			dwSleep = 5;
+			if (pItem->Prepare(m_hWaveOut))
+			{
+				m_Queue.queue(pItem);
+			}
+			else
+			{
+				ATLASSERT(FALSE);
+			}
+		}
+		for (auto i = m_Queue.begin(); i != m_Queue.end(); ++i)
+		{
+			if (!(*i)->IsPlayed())
+			{
+				if (m_bMuted)
+				{
+					(*i)->Mute();
+				}
+				(*i)->Play(m_hWaveOut);
+			}
+		}		
 	}
-	m_Queue.Unlock();		
-
-	// allow thread switch doing this wait
-	::WaitForSingleObject(m_hStopEvent, dwSleep);
 }
 
 void CWavePlayThread::Pause()
@@ -304,38 +381,20 @@ void CWavePlayThread::Pause()
 	{
 		if (m_bPaused)
 		{
-			m_Queue.Lock(true);
 			m_bPaused = false;
 
-			if (m_nDropSize >= 0 && m_hDropEvent && m_nDropSize >= (LONG) m_Queue.size())
-			{
-				::SetEvent(m_hDropEvent);
-				Sleep(0);
-			}
-			else
-			{
-				for (auto i = m_Queue.begin(); i != m_Queue.end(); ++i)
-				{
-					if (!(*i)->IsPlayed())
-					{
-						(*i)->Play(m_hWaveOut);
-					}
-				}
-			}
-			m_Queue.Unlock();
+			::SetEvent(m_hEvent);
+			Sleep(0);
 
 			ATLVERIFY(waveOutRestart(m_hWaveOut) == MMSYSERR_NOERROR);
 		}
 		else
 		{
-			m_Queue.Lock(true);
-
 			if (waveOutPause(m_hWaveOut) == MMSYSERR_NOERROR)
 			{
 				::ResetEvent(m_hEvent);
 				m_bPaused = true;
 			}
-			m_Queue.Unlock();
 		}
 	}
 }
@@ -362,6 +421,8 @@ WORD CWavePlayThread::GetVolume()
 	return (WORD) (dwVolume & 0x0000ffff);
 }
 
+//////////////////////////////////////////////////////////
+// CAudioPlayer
 
 CAudioPlayer::CAudioPlayer()
 {
@@ -385,50 +446,63 @@ bool CAudioPlayer::Init(HANDLE hDataSource)
 
 	if (!m_hAudioData)
 		return false;
+	
+	m_threadWavePlay = std::make_shared<CWavePlayThread>();
 
-	SDL_AudioSpec wav_spec;
-
-	memset(&wav_spec, 0, sizeof(wav_spec));
-
-	// WAV parameters as usual
-	wav_spec.callback	= my_sdl_audio_callback;
-	wav_spec.userdata	= this;
-	wav_spec.freq		= 44100;
-	wav_spec.channels	= 2;
-	wav_spec.samples	= 4096;
-	wav_spec.format		= AUDIO_S16LSB;
-
-	// thanks to SDL we don't have much todo
-	if (SDL_OpenAudio(&wav_spec, NULL) < 0)
+	if (!m_threadWavePlay)
 	{
-		m_hAudioData.Close();
+		Close();
 		return false;
 	}
-	return true;
+	m_threadWavePlay->Init();
+	return m_threadWavePlay->Start([this](BYTE* pStream, ULONG dwLen) -> void { OnPlayAudio(pStream, dwLen); });
 }
 
 void CAudioPlayer::Play()
 {
-	if (m_hAudioData)
-		SDL_PauseAudio(0);
+	if (m_threadWavePlay && m_threadWavePlay->IsPaused())
+		m_threadWavePlay->Pause();
 }
 
 void CAudioPlayer::Pause()
 {
-	if (m_hAudioData)
-		SDL_PauseAudio(1);
+	if (m_threadWavePlay && !m_threadWavePlay->IsPaused())
+		m_threadWavePlay->Pause();
 }
 
 void CAudioPlayer::Close()
 {
-	if (m_hAudioData)
-	{ 
-		SDL_CloseAudio();
+	if (m_threadWavePlay)
+	{
+		m_threadWavePlay->Stop();
 		m_hAudioData.Close();
+		m_threadWavePlay.reset();
 	}
 }
 
-void CAudioPlayer::OnPlayAudio(BYTE* pStream, DWORD dwLen)
+void  CAudioPlayer::FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, double lfVolume)
+{
+	ATLASSERT(pDest && pSrc && dwBytes % SAMPLE_FACTOR == 0 && lfVolume >= 0);
+
+	if (dwBytes)
+	{
+		const short*	sample_in			= (const short*)pSrc;
+		short*			sample_out			= (short*)pDest;
+
+		dwBytes /= SAMPLE_FACTOR;
+
+		do
+		{
+			for (auto i = 0; i < NUM_CHANNELS; ++i)
+			{
+				*sample_out++ = (short) (((double)*sample_in++) * lfVolume);
+			}
+		}				
+		while (--dwBytes);
+	}
+}
+
+void CAudioPlayer::OnPlayAudio(BYTE* pStream, ULONG dwLen)
 {
 	if (dwLen)
 	{

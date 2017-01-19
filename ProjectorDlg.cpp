@@ -82,7 +82,7 @@ CProjectorDlg::~CProjectorDlg()
 {
 }
 
-void CProjectorDlg::CloseSDL()
+void CProjectorDlg::StopAudio()
 {
 	if (m_hAudioDecoder)
 	{
@@ -93,7 +93,7 @@ void CProjectorDlg::CloseSDL()
 	}
 }
 
-void CProjectorDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
+void CProjectorDlg::OnPlayAudio(BYTE* pStream, ULONG dwLen)
 {
 	if (dwLen)
 	{
@@ -125,19 +125,7 @@ void CProjectorDlg::OnPlayAudio(BYTE* pStream, DWORD dwLen)
 			// fade sound after we've reached 90%
 			double lfVolume = (100.0 - m_nProgress) / 10.0;
 
-			short*		sample_in			= (short*)(BYTE*)buf;
-			short*		sample_out			= (short*)pStream;
-
-			dwReadTotal /= SAMPLE_FACTOR;
-
-			do
-			{
-				for (auto i = 0; i < NUM_CHANNELS; ++i)
-				{
-					*sample_out++ = (short) (((double)*sample_in++) * lfVolume);
-				}
-			}				
-			while (--dwReadTotal);
+			FadeSamples(pStream, buf, dwReadTotal, lfVolume);
 		}
 		else
 		{
@@ -279,7 +267,7 @@ LRESULT CProjectorDlg::OnInitDialog(HWND, LPARAM)
 				ALIGN_DOWN_TO_SAMPLE(sizePCM);
 
 				// calc offset where we're fading out
-				ULONGLONG offFade = (ULONGLONG)(FADEOUT_MARKER_PERCENT * sizePCM);
+				ULONGLONG offFade = (ULONGLONG)(FADEOUT_MARKER_PERCENT * sizePCM / 100);
 
 				// align offset to sample border
 				ALIGN_DOWN_TO_SAMPLE(offFade);
@@ -424,7 +412,7 @@ void CProjectorDlg::OnClose(UINT, int wID, HWND)
 	CMyThread::Stop();
 
 	ShutdownImGui();
-	CloseSDL();
+	StopAudio();
 
 	if (m_hVideoEncoder)
 	{
@@ -764,7 +752,7 @@ bool CProjectorDlg::CreateScene()
 	posRightBorder.x -= boundsSpace.x;
 
 	// sprinkle some stars
-	while (m_listStars.size() < m_nStarCount)
+	while ((int)m_listStars.size() < m_nStarCount)
 	{
 		std::shared_ptr<C3DStar> pStar = std::make_shared<C3DStar>();
 
