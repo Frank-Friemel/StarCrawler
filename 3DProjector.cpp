@@ -286,9 +286,6 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 
 	io.Fonts->GetTexDataAsAlpha8(&pImGuiTexture, &m_nTextureWidth, &m_nTextureHeight);
 
-	m_lfTextureWidth	= static_cast<float>(m_nTextureWidth);
-	m_lfTextureHeight	= static_cast<float>(m_nTextureHeight);
-
 	ATLASSERT(pImGuiTexture);
 	ATLVERIFY(m_pImGuiTexture.Reallocate(m_nTextureHeight*m_nTextureWidth));
 
@@ -389,7 +386,7 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 
 					SetScissors(static_cast<int>(pcmd->ClipRect.x), static_cast<int>(round(pcmd->ClipRect.y)), static_cast<int>(pcmd->ClipRect.z), static_cast<int>(round(pcmd->ClipRect.w)));
 
-					if (!pcmd->TextureId || !TriangleDraw(v0, v2, v1))
+					if (!pcmd->TextureId || !TriangleDraw(v0, v2, v1, (const float*)pcmd->TextureId, m_nTextureWidth, m_nTextureHeight))
 					{
 						PIXEL2D pxl[4];
 						BYTE	cmd[4];
@@ -423,9 +420,9 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 }
 
 // http://forum.devmaster.net/t/advanced-rasterization/6145
-bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2)
+bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight)
 {
-	bool bDrawed = false;
+	bool bDrawn = false;
 
 	const auto vx0 = vertex0.pos.x;
 	const auto vy0 = vertex0.pos.y;
@@ -454,13 +451,13 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	const int mask       = (1 << precission) - 1;
 
 	// Fixed-point coordinates
-	const int Y1 = (int)(vy0 * static_cast<float>(1 << precission));
-	const int Y2 = (int)(vy1 * static_cast<float>(1 << precission));
-	const int Y3 = (int)(vy2 * static_cast<float>(1 << precission));
+	const int Y1 = (int)round(vy0 * static_cast<float>(1 << precission));
+	const int Y2 = (int)round(vy1 * static_cast<float>(1 << precission));
+	const int Y3 = (int)round(vy2 * static_cast<float>(1 << precission));
 
-	const int X1 = (int)(vx0 * static_cast<float>(1 << precission));
-	const int X2 = (int)(vx1 * static_cast<float>(1 << precission));
-	const int X3 = (int)(vx2 * static_cast<float>(1 << precission));
+	const int X1 = (int)round(vx0 * static_cast<float>(1 << precission));
+	const int X2 = (int)round(vx1 * static_cast<float>(1 << precission));
+	const int X3 = (int)round(vx2 * static_cast<float>(1 << precission));
 
 	// Deltas
 	const int DX12 = X1 - X2;
@@ -521,31 +518,31 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 				break;
 
 			// Corners of block
-			int x0 = x << 4;
-			int x1 = (x + q - 1) << 4;
-			int y0 = y << 4;
-			int y1 = (y + q - 1) << 4;
+			int x0 = x << precission;
+			int x1 = (x + q - 1) << precission;
+			int y0 = y << precission;
+			int y1 = (y + q - 1) << precission;
 
 			// Evaluate half-space functions
 			bool a00 = C1 + DX12 * y0 - DY12 * x0 > 0;
 			bool a10 = C1 + DX12 * y0 - DY12 * x1 > 0;
 			bool a01 = C1 + DX12 * y1 - DY12 * x0 > 0;
 			bool a11 = C1 + DX12 * y1 - DY12 * x1 > 0;
-			
+
 			int a = (a00 << 0) | (a10 << 1) | (a01 << 2) | (a11 << 3);
 
 			bool b00 = C2 + DX23 * y0 - DY23 * x0 > 0;
 			bool b10 = C2 + DX23 * y0 - DY23 * x1 > 0;
 			bool b01 = C2 + DX23 * y1 - DY23 * x0 > 0;
 			bool b11 = C2 + DX23 * y1 - DY23 * x1 > 0;
-			
+
 			int b = (b00 << 0) | (b10 << 1) | (b01 << 2) | (b11 << 3);
 
 			bool c00 = C3 + DX31 * y0 - DY31 * x0 > 0;
 			bool c10 = C3 + DX31 * y0 - DY31 * x1 > 0;
 			bool c01 = C3 + DX31 * y1 - DY31 * x0 > 0;
 			bool c11 = C3 + DX31 * y1 - DY31 * x1 > 0;
-			
+
 			int c = (c00 << 0) | (c10 << 1) | (c01 << 2) | (c11 << 3);
 
 			// Skip block when outside an edge
@@ -565,18 +562,18 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 							{
 								if (red < 0)
 								{
-									int vu		= static_cast<int>((vu2 + vu0 + vu1) / 3 * m_lfTextureWidth);
-									int vv		= static_cast<int>((vv2 + vv0 + vv1) / 3 * m_lfTextureHeight);
-									int vtx		= mymax(0, mymin(vu, m_nTextureWidth - 1));
-									int vty		= mymax(0, mymin(vv, m_nTextureHeight - 1));
-									
-									red		= static_cast<int>((c2.Value.x + c0.Value.x + c1.Value.x) * 255 / 3);
-									green	= static_cast<int>((c2.Value.y + c0.Value.y + c1.Value.y) * 255 / 3);
-									blue	= static_cast<int>((c2.Value.z + c0.Value.z + c1.Value.z) * 255 / 3);
-									alpha	= static_cast<int>((c2.Value.w + c0.Value.w + c1.Value.w) / 3.0f * m_pImGuiTexture[vtx + vty * m_nTextureWidth]);
+									int vu		= static_cast<int>(round((vu2 + vu0 + vu1) * nTextureWidth)  / 3.0 );
+									int vv		= static_cast<int>(round((vv2 + vv0 + vv1) * nTextureHeight) / 3.0 );
+									int vtx		= mymax(0, mymin(vu, nTextureWidth - 1));
+									int vty		= mymax(0, mymin(vv, nTextureHeight - 1));
+
+									red		= static_cast<int>(round(((c2.Value.x + c0.Value.x + c1.Value.x) * 255) / 3));
+									green	= static_cast<int>(round(((c2.Value.y + c0.Value.y + c1.Value.y) * 255) / 3));
+									blue	= static_cast<int>(round(((c2.Value.z + c0.Value.z + c1.Value.z) * 255) / 3));
+									alpha	= static_cast<int>(round(((c2.Value.w + c0.Value.w + c1.Value.w) * pTexture[vtx + vty * nTextureWidth]) / 3.0) );
 								}
 								BlendColor(ix, iy, red, green, blue, alpha);
-								bDrawed = true;
+								bDrawn = true;
 							}
 							else if (ix >= m_szViewport.cx)
 								break;
@@ -609,19 +606,19 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 							{
 								if (CX1 > 0 && CX2 > 0 && CX3 > 0)
 								{
-									const auto r = static_cast<int>((c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC2);
-									const auto g = static_cast<int>((c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC2);
-									const auto b = static_cast<int>((c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC2);
-									const auto u = static_cast<int>((vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC1 * m_lfTextureWidth);
-									const auto v = static_cast<int>((vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC1 * m_lfTextureHeight);
+									const auto r = static_cast<int>(round((c2.Value.x * CX1 + c0.Value.x * CX2 + c1.Value.x * CX3) * iC2));
+									const auto g = static_cast<int>(round((c2.Value.y * CX1 + c0.Value.y * CX2 + c1.Value.y * CX3) * iC2));
+									const auto b = static_cast<int>(round((c2.Value.z * CX1 + c0.Value.z * CX2 + c1.Value.z * CX3) * iC2));
+									const auto u = static_cast<int>(round((vu2 * CX1 + vu0 * CX2 + vu1 * CX3) * iC1 * nTextureWidth));
+									const auto v = static_cast<int>(round((vv2 * CX1 + vv0 * CX2 + vv1 * CX3) * iC1 * nTextureHeight));
 
-									const auto tx = mymax(0, mymin(u, m_nTextureWidth - 1));
-									const auto ty = mymax(0, mymin(v, m_nTextureHeight - 1));
+									const auto tx = mymax(0, mymin(u, nTextureWidth - 1));
+									const auto ty = mymax(0, mymin(v, nTextureHeight - 1));
 
-									const auto a = static_cast<int>((c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC1 * m_pImGuiTexture[tx + ty * m_nTextureWidth]);
+									const auto a = static_cast<int>(round((c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC1 * pTexture[tx + ty * nTextureWidth]));
 
 									BlendColor(ix, iy, r, g, b, a);
-									bDrawed = true;
+									bDrawn = true;
 								}
 							}
 							else if (ix >= m_szViewport.cx)
@@ -634,7 +631,7 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 					}
 					else if (iy >= m_szViewport.cy)
 						break;
-					
+
 					CY1 += FDX12;
 					CY2 += FDX23;
 					CY3 += FDX31;
@@ -642,7 +639,7 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 			}
 		}
 	}
-	return bDrawed;
+	return bDrawn;
 }
 
 

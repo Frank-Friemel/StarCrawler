@@ -167,7 +167,7 @@ protected:
 
 private:
 	static void		ImGui_Impl_RenderDrawLists(ImDrawData* draw_data);
-	bool			TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2);
+	bool			TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight);
 
 protected:
 	SIZE				m_szViewport;
@@ -183,8 +183,6 @@ protected:
 	CTempBuffer<float>	m_pImGuiTexture;
 	int					m_nTextureWidth;
 	int					m_nTextureHeight;
-	float				m_lfTextureWidth;
-	float				m_lfTextureHeight;
 	LARGE_INTEGER		m_ImGuiPrevTime;
 	float				m_TicksPerSecond;
 	CRect				m_rectClip;
