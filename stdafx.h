@@ -7,8 +7,10 @@
 
 // Change these values to use different versions
 #define _WIN32_WINNT	_WIN32_WINNT_VISTA	
-#define _WIN32_IE		0x0501
+#define _WIN32_IE		0x0600
 #define _RICHEDIT_VER	0x0500
+
+#define GLM_ENABLE_EXPERIMENTAL
 
 #include <SDKDDKVer.h>
 

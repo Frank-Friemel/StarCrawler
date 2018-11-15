@@ -371,9 +371,9 @@ public:
 	long	GetSelectedType();
 
 protected:
-	WTL::CString	m_strPathName;
-	WTL::CString	m_strInitialDir;
-	WTL::CString	m_strDefExt;
+	ATL::CString	m_strPathName;
+	ATL::CString	m_strInitialDir;
+	ATL::CString	m_strDefExt;
 	long			m_nSelectedType;
 private:
 	TCHAR			m_Buf[MAX_PATH];

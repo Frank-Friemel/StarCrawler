@@ -25,8 +25,8 @@ public:
 		return TRUE;
 	}
 public:
-	WTL::CString m_strPathName;
-	WTL::CString m_strDefExt;
+	ATL::CString m_strPathName;
+	ATL::CString m_strDefExt;
 
 	long	m_nSelectedType;
 
@@ -55,7 +55,7 @@ BOOL CFilePicker::Load(LPCTSTR Title, int AnzFilter, ...)
 	TCHAR*  s1;
 	TCHAR*  s2;
 
-	WTL::CString strFilter;
+	ATL::CString strFilter;
 
 	va_list	marker;
 	va_start(marker, AnzFilter);
@@ -119,7 +119,7 @@ BOOL CFilePicker::Save(LPCTSTR Title, int AnzFilter, ...)
 	TCHAR*	filter = NULL;
 	TCHAR*  s1;
 	TCHAR*  s2;
-	WTL::CString strFilter;
+	ATL::CString strFilter;
 
 	va_list	marker;
 	va_start(marker, AnzFilter);

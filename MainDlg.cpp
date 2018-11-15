@@ -170,10 +170,10 @@ void CMainDlg::OnExport(UINT, int, HWND)
 
 	file_picker.SetDefExt(L".mp4");
 
-	WTL::CString strLabel(L"Export File");
+	ATL::CString strLabel(L"Export File");
 
-	WTL::CString strPoject(L"MPEG4 File");
-	WTL::CString strMask = WTL::CString(L"*") + WTL::CString(L".mp4");
+	ATL::CString strPoject(L"MPEG4 File");
+	ATL::CString strMask = ATL::CString(L"*") + ATL::CString(L".mp4");
 
 	file_picker.SetPathName(m_pProjectorDlg->m_strExportFile.c_str());
 
