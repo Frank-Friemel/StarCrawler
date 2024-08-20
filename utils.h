@@ -23,7 +23,7 @@ namespace local_utils
 
 HANDLE			DuplicateHandle(HANDLE h);
 ULONGLONG		Shovel(HANDLE hFrom, HANDLE hTo, ULONGLONG nBytesToShovel, bool bInputHandleIsPipe = false);
-HANDLE			Exec(LPCTSTR strCmd, DWORD dwWait = INFINITE, bool bStdInput = false, HANDLE* phWrite = NULL, WORD wShowWindow = SW_HIDE, PCWSTR strPath = NULL, HANDLE* phStdOut = NULL, HANDLE* phStdErr = NULL, DWORD nPipeBufferSize = 0);
+HANDLE			Exec(LPCWSTR strCmd, WORD wShowWindow = SW_SHOWNORMAL, PHANDLE phStdOut = NULL, PHANDLE phStdIn = NULL) noexcept;
 std::wstring	GetModulePath(HMODULE hModule = NULL, PCWSTR strModuleName = NULL);
 std::wstring	LocateModulePath(PCWSTR strModule, PCWSTR strDefaultExtension = L".exe");
 bool			WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight);
@@ -607,7 +607,7 @@ public:
 	{
 		return c_strPathToCoder;
 	}
-	HANDLE	StartCoder(PHANDLE phStdIn = NULL, PHANDLE phStdOut = NULL);
+	HANDLE	StartCoder(PHANDLE phStdOut = NULL, PHANDLE phStdIn = NULL);
 	
 	HANDLE	DecodeAudioToPipe(std::wstring strAudioSourceFile, PHANDLE phPipe, bool bRawPCM = true);
 	HANDLE	DecodeAudioToFile(std::wstring strAudioSourceFile, std::wstring strAudioDestFile, bool bRawPCM = false);
@@ -637,7 +637,7 @@ public:
 		quoted
 	} token_type;
 
-	typedef struct
+	typedef struct unnamed
 	{
 		inline value_type ToString() const
 		{

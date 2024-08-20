@@ -206,7 +206,7 @@ void CMainDlg::OnExport(UINT, int, HWND)
 				strExec += m_pProjectorDlg->m_strExportFile;
 				strExec += L"\"";
 
-				Exec(strExec.c_str(), 0, false, NULL, SW_SHOWNORMAL);
+				Exec(strExec.c_str());
 			}
 		}
 		else

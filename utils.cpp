@@ -237,7 +237,7 @@ CAVCoder::CAVCoder(PCWSTR strCoderName /*= L"ffmpeg"*/)
 	}
 }
 
-HANDLE CAVCoder::StartCoder(PHANDLE phStdIn /* = NULL*/, PHANDLE phStdOut /* = NULL*/)
+HANDLE CAVCoder::StartCoder(PHANDLE phStdOut /* = NULL*/, PHANDLE phStdIn /*= NULL*/)
 {
 	std::wstring strCmd = c_strPathToCoder;
 
@@ -246,7 +246,7 @@ HANDLE CAVCoder::StartCoder(PHANDLE phStdIn /* = NULL*/, PHANDLE phStdOut /* = N
 		strCmd += L" ";
 		strCmd += m_strParamaters;
 	}
-	return Exec(strCmd.c_str(), 0, phStdIn || phStdOut ? true : false, phStdIn, SW_HIDE, NULL, phStdOut);
+	return Exec(strCmd.c_str(), SW_HIDE, phStdOut, phStdIn);
 }
 
 HANDLE CAVCoder::DecodeAudioToPipe(std::wstring strAudioSourceFile, PHANDLE phPipe, bool bRawPCM /* = true */)
@@ -256,7 +256,7 @@ HANDLE CAVCoder::DecodeAudioToPipe(std::wstring strAudioSourceFile, PHANDLE phPi
 												+ std::wstring(bRawPCM ? L"-f s16le" : L"-f WAV")
 												+ std::wstring(L" pipe:");
 
-	return StartCoder(NULL, phPipe);
+	return StartCoder(phPipe);
 }
 
 HANDLE CAVCoder::DecodeAudioToFile(std::wstring strAudioSourceFile, std::wstring strAudioDestFile, bool bRawPCM /*= false*/)
@@ -297,7 +297,7 @@ HANDLE CAVCoder::EncodeSlideShow(std::wstring strMP4DestFile, PHANDLE phPipe, in
 			, strMP4DestFile.c_str());
 	}
 	m_strParamaters = strFFMpegCmd;
-	return StartCoder(phPipe);
+	return StartCoder(NULL, phPipe);
 }
 
 
@@ -313,108 +313,123 @@ HANDLE DuplicateHandle(HANDLE h)
 	return hResult;
 }
 
-HANDLE Exec(LPCTSTR strCmd, DWORD dwWait /*= INFINITE*/, bool bStdInput /*= false*/, HANDLE* phWrite /*= NULL*/, WORD wShowWindow /*= SW_HIDE*/, PCWSTR strPath /* = NULL*/, HANDLE* phStdOut /*= NULL*/, HANDLE* phStdErr /*= NULL*/, DWORD nPipeBufferSize /* = 0*/)
+HANDLE Exec(LPCWSTR strCmd, WORD wShowWindow /*= SW_SHOWNORMAL*/, PHANDLE phStdOut /*= NULL*/, PHANDLE phStdIn /*= NULL*/) noexcept
 {
-	STARTUPINFO			si;
-	PROCESS_INFORMATION	pi;
+	if (!strCmd)
+	{
+		SetLastError(ERROR_INVALID_PARAMETER);
+		return NULL;
+	}
+	// length of string + terminating \0
+	const size_t strCmdSize = wcslen(strCmd) + 1;
 
-	memset(&pi, 0, sizeof(pi));
-	memset(&si, 0, sizeof(si));
+	std::vector<WCHAR> strCmdCopy;
+
+	try
+	{
+		strCmdCopy.resize(strCmdSize);
+	}
+	catch (...)
+	{
+		return NULL;
+	}
+	memcpy(strCmdCopy.data(), strCmd, strCmdSize * sizeof(wchar_t));
+
+	STARTUPINFOW si{};
 
 	si.cb			= sizeof(si);
 	si.dwFlags		= STARTF_USESHOWWINDOW;
 	si.wShowWindow	= wShowWindow;
 
-	HANDLE hwrite = INVALID_HANDLE_VALUE;
-
-	if (phStdOut)
+	if (phStdOut || phStdIn)
 	{
-		*phStdOut = INVALID_HANDLE_VALUE;
-	}
-	if (phStdErr)
-	{
-		*phStdErr = INVALID_HANDLE_VALUE;
-	}
-	if (bStdInput)
-	{
-		HANDLE hread = INVALID_HANDLE_VALUE;
-		HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
-		HANDLE herr = GetStdHandle(STD_ERROR_HANDLE);
+		// we want to communicate to the new process (via pipes)
+		si.dwFlags |= STARTF_USESTDHANDLES;
 
-		SECURITY_ATTRIBUTES   sa;
+		// populate startup-info with valid default handles (which need not to be closed)
+		si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+		si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
 
-		sa.nLength				= sizeof(sa);
-		sa.lpSecurityDescriptor = NULL;
-		sa.bInheritHandle		= TRUE;
-
-		if (CreatePipe(&hread, &hwrite, &sa, nPipeBufferSize))
+		if (phStdOut)
 		{
-			if (phStdOut)
-			{
-				hout = INVALID_HANDLE_VALUE;
-				ATLVERIFY(CreatePipe(phStdOut, &hout, &sa, nPipeBufferSize));
-				SetHandleInformation(*phStdOut, HANDLE_FLAG_INHERIT, 0);
-			}
-			if (phStdErr)
-			{
-				herr = INVALID_HANDLE_VALUE;
-				ATLVERIFY(CreatePipe(phStdErr, &herr, &sa, nPipeBufferSize));
-				SetHandleInformation(*phStdErr, HANDLE_FLAG_INHERIT, 0);
-			}
-			SetHandleInformation(hwrite, HANDLE_FLAG_INHERIT, 0);
+			*phStdOut = INVALID_HANDLE_VALUE;
 
-			if (phWrite != NULL)
-				*phWrite = hwrite;
+			SECURITY_ATTRIBUTES   sa{};
 
-			si.hStdInput	= hread;
-			si.hStdOutput	= hout;
-			si.hStdError	= herr;
-			si.dwFlags		|= STARTF_USESTDHANDLES;
+			sa.nLength = sizeof(sa);
+			sa.lpSecurityDescriptor = NULL;
+			sa.bInheritHandle = TRUE;
+
+			if (!CreatePipe(phStdOut, &si.hStdOutput, &sa, 0))
+			{
+				return NULL;
+			}
+			SetHandleInformation(*phStdOut, HANDLE_FLAG_INHERIT, 0);
+		}
+		if (phStdIn)
+		{
+			*phStdIn = INVALID_HANDLE_VALUE;
+
+			SECURITY_ATTRIBUTES   sa{};
+
+			sa.nLength = sizeof(sa);
+			sa.lpSecurityDescriptor = NULL;
+			sa.bInheritHandle = TRUE;
+
+			if (!CreatePipe(&si.hStdInput, phStdIn, &sa, 0))
+			{
+				if (phStdOut)
+				{
+					// cleanup after failure
+					CloseHandle(*phStdOut);
+					CloseHandle(si.hStdOutput);
+					*phStdOut = INVALID_HANDLE_VALUE;
+				}
+				return NULL;
+			}
+			SetHandleInformation(*phStdIn, HANDLE_FLAG_INHERIT, 0);
 		}
 	}
-	CTempBuffer<TCHAR> _strCmd(_tcslen(strCmd) + 1);
 
-	_tcscpy_s(_strCmd, _tcslen(strCmd) + 1, strCmd);
+	PROCESS_INFORMATION	pi{};
 
-	if (CreateProcess(NULL, _strCmd, NULL, NULL, bStdInput ? TRUE : FALSE, 0, NULL, strPath, &si, &pi))
+	// now, start the process...
+	if (CreateProcessW(NULL, strCmdCopy.data(), NULL, NULL, (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : FALSE, 0, NULL, NULL, &si, &pi))
 	{
+		// close unused handle
 		CloseHandle(pi.hThread);
+	}
+	else
+	{
+		// fail -> no process handle to return
+		pi.hProcess = NULL;
 
-		if (si.dwFlags & STARTF_USESTDHANDLES)
+		// cleanup
+		if (phStdOut)
+		{
+			CloseHandle(*phStdOut);
+			*phStdOut = INVALID_HANDLE_VALUE;
+		}
+		if (phStdIn)
+		{
+			CloseHandle(*phStdIn);
+			*phStdIn = INVALID_HANDLE_VALUE;
+		}
+	}
+	if (si.dwFlags & STARTF_USESTDHANDLES)
+	{
+		// close duplicated/unused handles
+		if (si.hStdInput != GetStdHandle(STD_INPUT_HANDLE))
 		{
 			ATLVERIFY(CloseHandle(si.hStdInput));
-
-			if (phStdOut)
-			{
-				ATLVERIFY(CloseHandle(si.hStdOutput));
-			}
-			if (phStdErr)
-			{
-				ATLVERIFY(CloseHandle(si.hStdError));
-			}
 		}
-		if (WaitForSingleObject(pi.hProcess, dwWait) != WAIT_OBJECT_0)
-			return pi.hProcess;
-		CloseHandle(pi.hProcess);
+		if (si.hStdOutput != GetStdHandle(STD_OUTPUT_HANDLE))
+		{
+			ATLVERIFY(CloseHandle(si.hStdOutput));
+		}
 	}
-	if (hwrite != INVALID_HANDLE_VALUE)
-	{
-		CloseHandle(hwrite);
-
-		if (phWrite != NULL)
-			*phWrite = INVALID_HANDLE_VALUE;
-	}
-	if (phStdOut && *phStdOut != INVALID_HANDLE_VALUE)
-	{
-		CloseHandle(*phStdOut);
-		*phStdOut = INVALID_HANDLE_VALUE;
-	}
-	if (phStdErr && *phStdErr != INVALID_HANDLE_VALUE)
-	{
-		CloseHandle(*phStdErr);
-		*phStdErr = INVALID_HANDLE_VALUE;
-	}
-	return NULL;
+	return pi.hProcess;
 }
 
 std::wstring GetModulePath(HMODULE hModule /*= NULL*/, PCWSTR strModuleName /* = NULL*/)
