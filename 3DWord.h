@@ -10,72 +10,20 @@ public:
 
 	bool Create(PCWSTR strWord, const LOGFONT* pLogFont, bool bHinted = false);
 
-	virtual void Clear();
-	virtual void Draw(C3DProjector* pProjector);
+	void Clear() override;
+	void Draw(I3DProjector* pProjector, uint8_t* frameBuffer) const override;
+	glm::dvec3 GetBoundingBox() const override;
 
-	glm::dvec3 GetBoundingBox() const;
-
-	void RotateX(double lfDegree)
-	{
-		__super::RotateX(lfDegree);
-
-		for each (auto& c in m_listChars)
-			c->RotateX(lfDegree);
-	}
-	void Move(const glm::dmat4& matTrans)
-	{
-		__super::Move(matTrans);
-
-		for each (auto& c in m_listChars)
-			c->Move(matTrans);
-	}
-	void Move(const glm::dvec3& vecTrans)
-	{
-		__super::Move(vecTrans);
-
-		for each (auto& c in m_listChars)
-			c->Move(vecTrans);
-	}
-	void MoveX(double lfTrans)
-	{
-		__super::MoveX(lfTrans);
-
-		for each (auto& c in m_listChars)
-			c->MoveX(lfTrans);
-	}
-	void MoveZ(double lfTrans)
-	{
-		__super::MoveZ(lfTrans);
-
-		for each (auto& c in m_listChars)
-			c->MoveZ(lfTrans);
-	}
-	void Scale(double lfFactor)
-	{
-		__super::Scale(lfFactor);
-
-		for each (auto& c in m_listChars)
-			c->Scale(lfFactor);
-	}
-	void SetColor(double r, double g, double b)
-	{
-		__super::SetColor(r, g, b);
-
-		for each (auto& c in m_listChars)
-			c->SetColor(r, g, b);
-	}
-	void SetAlpha(double value)
-	{
-		if (value >= 0.0 && value <= 1.0)
-		{
-			__super::SetAlpha(value);
-
-			for each (auto& c in m_listChars)
-				c->SetAlpha(value);
-		}
-	}
+	void RotateX(double lfDegree);
+	void Move(const glm::dmat4& matTrans);
+	void Move(const glm::dvec3& vecTrans);
+	void MoveX(double lfTrans);
+	void MoveZ(double lfTrans);
+	void Scale(double lfFactor);
+	void SetColor(double r, double g, double b);
+	void SetAlpha(double value);
 
 private:
-	std::list< std::shared_ptr<C3DGlyph> > 	m_listChars;
+	std::list<std::shared_ptr<C3DGlyph>> m_listChars;
 };
 

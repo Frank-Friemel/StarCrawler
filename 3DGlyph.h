@@ -10,7 +10,6 @@ public:
 
 	bool Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted = false);
 
-	virtual glm::dvec3 GetBoundingBox() const;
-
+	glm::dvec3 GetBoundingBox() const override;
 };
 

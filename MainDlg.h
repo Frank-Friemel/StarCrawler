@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include "3DProjector.h"
-#include "3DObject.h"
-
 class CProjectorDlg;
 
 

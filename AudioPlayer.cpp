@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "AudioPlayer.h"
 
-
 #pragma comment(lib, "Winmm.lib")
 
+using namespace local_utils;
 
 ////////////////////////////////////////////////////////////////
 // CWaveQueueItem
@@ -36,7 +36,7 @@ public:
 	void Mute();
 
 public:
-	CTempBuffer<BYTE>			m_Blob;
+	CTempBuffer<uint8_t>			m_Blob;
 	ULONG						m_nLen;
 
 private:
@@ -50,7 +50,7 @@ private:
 class CWavePlayThread : protected CMyThread
 {
 public:
-	typedef std::function<void(BYTE* pStream, ULONG dwLen)>	callback_t;
+	typedef std::function<void(uint8_t* pStream, ULONG dwLen)>	callback_t;
 
 	CWavePlayThread(UINT nDeviceID = WAVE_MAPPER);
 	~CWavePlayThread();
@@ -112,7 +112,7 @@ bool CWaveQueueItem::Prepare(HWAVEOUT hWaveOut)
 	if ((m_WaveHeader.dwFlags & WHDR_PREPARED) == 0)
 	{
 		m_WaveHeader.dwBufferLength	= m_nLen;
-		m_WaveHeader.lpData			= (LPSTR)(BYTE*) m_Blob;
+		m_WaveHeader.lpData			= (LPSTR)(uint8_t*) m_Blob;
 
 		if (MMSYSERR_NOERROR != waveOutPrepareHeader(hWaveOut, &m_WaveHeader, sizeof(m_WaveHeader)))
 		{
@@ -229,8 +229,8 @@ void CWavePlayThread::Free(std::shared_ptr<CWaveQueueItem>& pItem)
 {
 	ATLASSERT(pItem);
 	pItem->InitNew();
-	m_Pool.queue(pItem);
-	pItem.reset();
+	m_Pool.queue(move(pItem));
+	ATLASSERT(!pItem);
 }
 
 bool CWavePlayThread::Start(callback_t callback, size_t nThreshold /*= 16*/)
@@ -363,7 +363,7 @@ void CWavePlayThread::OnEvent()
 
 			if (pItem->Prepare(m_hWaveOut))
 			{
-				m_Queue.queue(pItem);
+				m_Queue.queue(move(pItem));
 			}
 			else
 			{
@@ -478,7 +478,7 @@ bool CAudioPlayer::Init(HANDLE hDataSource)
 		return false;
 	}
 	m_threadWavePlay->Init();
-	return m_threadWavePlay->Start([this](BYTE* pStream, ULONG dwLen) -> void { OnPlayAudio(pStream, dwLen); });
+	return m_threadWavePlay->Start([this](uint8_t* pStream, ULONG dwLen) -> void { OnPlayAudio(pStream, dwLen); });
 }
 
 void CAudioPlayer::Play()
@@ -504,7 +504,7 @@ void CAudioPlayer::Close()
 		m_hAudioData.Close();
 }
 
-void  CAudioPlayer::FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, double lfVolume)
+void  CAudioPlayer::FadeSamples(void* pDest, const uint8_t* pSrc, ULONG dwBytes, double lfVolume)
 {
 	ATLASSERT(pDest && pSrc && dwBytes % SAMPLE_FACTOR == 0 && lfVolume >= 0);
 
@@ -526,7 +526,7 @@ void  CAudioPlayer::FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, do
 	}
 }
 
-void CAudioPlayer::OnPlayAudio(BYTE* pStream, ULONG dwLen)
+void CAudioPlayer::OnPlayAudio(uint8_t* pStream, ULONG dwLen)
 {
 	if (dwLen)
 	{

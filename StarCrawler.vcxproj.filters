@@ -48,7 +48,7 @@
     <ClCompile Include="3DObject.cpp">
       <Filter>Source Files\3D</Filter>
     </ClCompile>
-    <ClCompile Include="3DProjector.cpp">
+    <ClCompile Include="3DProjectorImpl.cpp">
       <Filter>Source Files\3D</Filter>
     </ClCompile>
     <ClCompile Include="agg\agg_arc.cpp">
@@ -119,7 +119,7 @@
     <ClInclude Include="3DObject.h">
       <Filter>Header Files\3D</Filter>
     </ClInclude>
-    <ClInclude Include="3DProjector.h">
+    <ClInclude Include="3DProjectorImpl.h">
       <Filter>Header Files\3D</Filter>
     </ClInclude>
     <ClInclude Include="agg\include\agg_pixfmt_rgba.h">
@@ -154,6 +154,9 @@
     </ClInclude>
     <ClInclude Include="ProjectorDlg.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="I3DProjector.h">
+      <Filter>Header Files\3D</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

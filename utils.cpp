@@ -510,7 +510,7 @@ std::wstring LocateModulePath(PCWSTR strModule, PCWSTR strDefaultExtension /*= L
 	return strResult;
 }
 
-bool WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight)
+bool WritePPMData(HANDLE hTo, const uint8_t* pFrameBuffer, int nWidth, int nHeight)
 {
 	char buf[64];
 
@@ -530,7 +530,7 @@ bool WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight)
 ULONGLONG Shovel(HANDLE hFrom, HANDLE hTo, ULONGLONG nBytesToShovel, bool bInputHandleIsPipe /*= false*/)
 {
 	const ULONGLONG		sizeBuf = 0x100000;	// 1MB
-	CTempBuffer<BYTE>	buf((size_t)sizeBuf);
+	CTempBuffer<uint8_t>	buf((size_t)sizeBuf);
 
 	ULONG				dwRead		= 0;
 	ULONG				dwWritten	= 0;

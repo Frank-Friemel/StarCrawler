@@ -1,12 +1,11 @@
 #include "stdafx.h"
 #include "3DObject.h"
-#include "3DProjector.h"
+#include "3DProjectorImpl.h"
 #include "time.h"
 #include "imgui/imgui.h"
 
 #define mymax(__a,__b) ((__a) > (__b) ? (__a) : (__b))
 #define mymin(__a,__b) ((__a) < (__b) ? (__a) : (__b))
-
 
 typedef union _pixel_t
 {
@@ -33,8 +32,10 @@ typedef union _pixel_t
 	};
 } pixel_t;
 
-
-C3DProjector::C3DProjector(double zCam /*= 10*/, double zViewer /*= 1200*/)
+C3DProjectorImpl::C3DProjectorImpl(double zCam /*= 10*/, double zViewer /*= 1200*/)
+	: m_cameraPosition{ glm::dvec4(0.0, 0.0, zCam, 1) }
+	, m_viewerPosition{ glm::dvec4(0.0, 0.0, zViewer, 1) }
+	, m_matCamView{ glm::lookAt(glm::dvec3(0, 0, 1), glm::dvec3(0, 0, 0), glm::dvec3(0, 1, 0)) }
 {
 	m_lfWidth	= 0;
 	m_lfHeight	= 0;
@@ -43,24 +44,19 @@ C3DProjector::C3DProjector(double zCam /*= 10*/, double zViewer /*= 1200*/)
 	m_nStride	= 0;
 	m_bClip		= false;
 
-	m_c			= glm::dvec4(0.0, 0.0, zCam, 1);
-	m_e			= glm::dvec4(0.0, 0.0, zViewer, 1);
-
-	m_matCamView= glm::lookAt(glm::dvec3(0, 0, 1), glm::dvec3(0, 0, 0), glm::dvec3(0, 1, 0));
-
 	srand((unsigned int)::time(NULL));
 }
 
-C3DProjector::~C3DProjector()
+C3DProjectorImpl::~C3DProjectorImpl()
 {
 }
 
-double	C3DProjector::Random()
+double	C3DProjectorImpl::Random()
 {
 	return ((double)::rand()) / ((double)RAND_MAX);	
 }
 
-void C3DProjector::Prepare(const SIZE& sz, UINT nBitplaneCount)
+void C3DProjectorImpl::Prepare(const SIZE& sz, UINT nBitplaneCount)
 {
 	m_szViewport= sz;
 
@@ -73,27 +69,42 @@ void C3DProjector::Prepare(const SIZE& sz, UINT nBitplaneCount)
 }
 
 // 3D to 2D projection
-void C3DProjector::VertexToPixel(const glm::dvec4& v, PIXEL2D& ptPixel) const
+void C3DProjectorImpl::VertexToPixel(const glm::dvec4& vertex, PIXEL2D& ptPixel) const noexcept
 {
-	glm::dvec4 r;
-	glm::dvec4 d;
+	const glm::dvec4 r{ m_matCamView * vertex };
+	const glm::dvec4 d{ r - m_cameraPosition };
 
-	r = m_matCamView * v;
-	d = r - m_c;
-
-	double k = 0;
-
-	if (d.z)
-		k = m_e.z / d.z;
-
-	double x = (k * d.x) - m_e.x;
-	double y = (k * d.y) - m_e.y;
+	const double k = d.z ? m_viewerPosition.z / d.z : 0;
+	const double x = (k * d.x) - m_viewerPosition.x;
+	const double y = (k * d.y) - m_viewerPosition.y;
 
 	ptPixel.x = m_centerH - x;
 	ptPixel.y = m_centerV - y;
 }
 
-void C3DProjector::PixelToVertexStaticX(double xStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
+bool C3DProjectorImpl::IsVisible(const glm::dvec4& vertex, PIXEL2D* ptPixel /*= nullptr*/) const noexcept
+{
+	PIXEL2D ptScreen;
+	VertexToPixel(vertex, ptScreen);
+
+	if (ptPixel)
+	{
+		*ptPixel = ptScreen;
+	}
+	return ptScreen.x >= 0.0 && ptScreen.x < m_lfWidth && ptScreen.y >= 0.0 && ptScreen.y < m_lfHeight;
+}
+
+double C3DProjectorImpl::GetWidth() const
+{
+	return m_lfWidth;
+}
+
+double C3DProjectorImpl::GetHeight() const
+{
+	return m_lfHeight;
+}
+
+void C3DProjectorImpl::PixelToVertexStaticX(double xStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
 {
 	const glm::dvec4& col0 = m_matCamView[0];
 	const glm::dvec4& col1 = m_matCamView[1];
@@ -120,15 +131,15 @@ void C3DProjector::PixelToVertexStaticX(double xStatic, glm::dvec4& v, const PIX
 	v.x = xStatic;
 	v.w = 1;
 
-	double kk1 = (m_centerH - ptPixel.x + m_e.x) / m_e.z;
-	double kk2 = (m_centerV - ptPixel.y + m_e.y) / m_e.z;
+	double kk1 = (m_centerH - ptPixel.x + m_viewerPosition.x) / m_viewerPosition.z;
+	double kk2 = (m_centerV - ptPixel.y + m_viewerPosition.y) / m_viewerPosition.z;
 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_c.x); 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_c.y); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_cameraPosition.x); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_cameraPosition.y); 
 
-	double kk3 = _a*v.x + _d*v.w - m_c.x;
-	double kk4 = _e*v.x + _h*v.w - m_c.y;
-	double kk5 = _i*v.x + _l*v.w - m_c.z;
+	double kk3 = _a*v.x + _d*v.w - m_cameraPosition.x;
+	double kk4 = _e*v.x + _h*v.w - m_cameraPosition.y;
+	double kk5 = _i*v.x + _l*v.w - m_cameraPosition.z;
 
 	double kk6 = kk3 - kk1*kk5;
 	double kk7 = kk4 - kk2*kk5;
@@ -143,7 +154,7 @@ void C3DProjector::PixelToVertexStaticX(double xStatic, glm::dvec4& v, const PIX
 	v.y = kk10*v.z + kk11;
 }
 
-void C3DProjector::PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
+void C3DProjectorImpl::PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
 {
 	const glm::dvec4& col0 = m_matCamView[0];
 	const glm::dvec4& col1 = m_matCamView[1];
@@ -170,15 +181,15 @@ void C3DProjector::PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIX
 	v.y = yStatic;
 	v.w = 1;
 
-	double kk1 = (m_centerH - ptPixel.x + m_e.x) / m_e.z;
-	double kk2 = (m_centerV - ptPixel.y + m_e.y) / m_e.z;
+	double kk1 = (m_centerH - ptPixel.x + m_viewerPosition.x) / m_viewerPosition.z;
+	double kk2 = (m_centerV - ptPixel.y + m_viewerPosition.y) / m_viewerPosition.z;
 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_c.x); 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_c.y); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_cameraPosition.x); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_cameraPosition.y); 
 
-	double kk3 = _d*v.w + _b*v.y - m_c.x;
-	double kk4 = _h*v.w + _f*v.y - m_c.y;
-	double kk5 = _l*v.w + _j*v.y - m_c.z;
+	double kk3 = _d*v.w + _b*v.y - m_cameraPosition.x;
+	double kk4 = _h*v.w + _f*v.y - m_cameraPosition.y;
+	double kk5 = _l*v.w + _j*v.y - m_cameraPosition.z;
 	double kk6 = kk3 - kk5*kk1;
 	double kk7 = kk4 - kk5*kk2;
 	double kk8 = _k*kk2 - _g;
@@ -192,7 +203,7 @@ void C3DProjector::PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIX
 	v.z = v.x * kk10 + kk11;
 }
 
-void C3DProjector::PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
+void C3DProjectorImpl::PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const
 {
 	const glm::dvec4& col0 = m_matCamView[0];
 	const glm::dvec4& col1 = m_matCamView[1];
@@ -219,15 +230,15 @@ void C3DProjector::PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIX
 	v.z = zStatic;
 	v.w = 1;
 
-	double kk1 = (m_centerH - ptPixel.x + m_e.x) / m_e.z;
-	double kk2 = (m_centerV - ptPixel.y + m_e.y) / m_e.z;
+	double kk1 = (m_centerH - ptPixel.x + m_viewerPosition.x) / m_viewerPosition.z;
+	double kk2 = (m_centerV - ptPixel.y + m_viewerPosition.y) / m_viewerPosition.z;
 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_c.x); 
-	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_c.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_c.y); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk1 = (_a*v.x + _b*v.y + _c*v.z + _d*v.w - m_cameraPosition.x); 
+	// (_i*v.x + _j*v.y + _k*v.z + _l*v.w - m_cameraPosition.z) * kk2 = (_e*v.x + _f*v.y + _g*v.z + _h*v.w - m_cameraPosition.y); 
 
-	double kk3 = _c*v.z + _d*v.w - m_c.x;
-	double kk4 = _g*v.z + _h*v.w - m_c.y;
-	double kk5 = _k*v.z + _l*v.w - m_c.z;
+	double kk3 = _c*v.z + _d*v.w - m_cameraPosition.x;
+	double kk4 = _g*v.z + _h*v.w - m_cameraPosition.y;
+	double kk5 = _k*v.z + _l*v.w - m_cameraPosition.z;
 
 	double kk6 = kk3 - kk1*kk5;
 	double kk7 = kk4 - kk2*kk5;
@@ -242,9 +253,8 @@ void C3DProjector::PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIX
 	v.y = kk10*v.x  + kk11;
 }
 
-
 // imgui stuff
-void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
+void C3DProjectorImpl::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -297,7 +307,7 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 		}
 	}
 	// Store our identifier
-	io.Fonts->TexID					= m_pImGuiTexture;
+	io.Fonts->TexID = m_pImGuiTexture;
 
 	// Init timers
 	QueryPerformanceCounter(&m_ImGuiPrevTime);
@@ -307,17 +317,17 @@ void C3DProjector::InitImGui(HWND hWnd /* = NULL*/, bool bIniFile /*= false*/)
 	m_TicksPerSecond = static_cast<float>(liTicksPerSecond.QuadPart);
 }
 
-void C3DProjector::ShutdownImGui()
+void C3DProjectorImpl::ShutdownImGui()
 {
 	ImGui::Shutdown();
 }
 
-void C3DProjector::RenderImGui()
+void C3DProjectorImpl::RenderImGui()
 {
 	ImGui::Render();
 }
 
-void C3DProjector::NewFrameImGui()
+void C3DProjectorImpl::NewFrameImGui(uint8_t* frameBuffer)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
@@ -333,7 +343,7 @@ void C3DProjector::NewFrameImGui()
 	m_ImGuiPrevTime = current_time;
 
 	// Start the frame
-	ImGui::NewFrame();
+	ImGui::NewFrame(frameBuffer);
 
 	if (m_bDoubleClick)
 	{ 
@@ -342,16 +352,16 @@ void C3DProjector::NewFrameImGui()
 	}
 }
 
-void C3DProjector::ImGui_Impl_RenderDrawLists(ImDrawData* draw_data)
+void C3DProjectorImpl::ImGui_Impl_RenderDrawLists(ImDrawData* draw_data)
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	C3DProjector* pProjector = (C3DProjector*) io.UserData;
+	C3DProjectorImpl* pProjector = (C3DProjectorImpl*) io.UserData;
 
 	pProjector->RenderDrawLists(draw_data);
 }
 
-void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
+void C3DProjectorImpl::RenderDrawLists(ImDrawData* draw_data)
 {
 	for (int n = 0; n < draw_data->CmdListsCount; n++)
 	{
@@ -386,30 +396,29 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 
 					SetScissors(static_cast<int>(pcmd->ClipRect.x), static_cast<int>(round(pcmd->ClipRect.y)), static_cast<int>(pcmd->ClipRect.z), static_cast<int>(round(pcmd->ClipRect.w)));
 
-					if (!pcmd->TextureId || !TriangleDraw(v0, v2, v1, (const float*)pcmd->TextureId, m_nTextureWidth, m_nTextureHeight))
+					if (!pcmd->TextureId || !TriangleDraw(draw_data->frameBuffer, v0, v2, v1, (const float*)pcmd->TextureId, m_nTextureWidth, m_nTextureHeight))
 					{
-						PIXEL2D pxl[4];
-						BYTE	cmd[4];
+						PolyPoint polyPoints[4];
 
-						pxl[0].x	= v0.pos.x;
-						pxl[0].y	= v0.pos.y;
-						cmd[0]		= PT_MOVETO;
+						polyPoints[0].pixel.x	= v0.pos.x;
+						polyPoints[0].pixel.y	= v0.pos.y;
+						polyPoints[0].pathType	= PT_MOVETO;
 
-						pxl[1].x	= v2.pos.x;
-						pxl[1].y	= v2.pos.y;
-						cmd[1]		= PT_LINETO;
+						polyPoints[1].pixel.x	= v2.pos.x;
+						polyPoints[1].pixel.y	= v2.pos.y;
+						polyPoints[1].pathType	= PT_LINETO;
 
-						pxl[2].x	= v1.pos.x;
-						pxl[2].y	= v1.pos.y;
-						cmd[2]		= PT_LINETO;
+						polyPoints[2].pixel.x	= v1.pos.x;
+						polyPoints[2].pixel.y	= v1.pos.y;
+						polyPoints[2].pathType	= PT_LINETO;
 
-						pxl[3].x	= v0.pos.x+1;
-						pxl[3].y	= v0.pos.y+1;
-						cmd[3]		= PT_LINETO;
+						polyPoints[3].pixel.x	= v0.pos.x+1;
+						polyPoints[3].pixel.y	= v0.pos.y+1;
+						polyPoints[3].pathType	= PT_LINETO;
 
 						const auto c0 = ImColor(v0.col);
 
-						PolyDraw(pxl, cmd, 4, c0.Value.x, c0.Value.y, c0.Value.z, c0.Value.w);
+						PolyDraw(draw_data->frameBuffer, polyPoints, 4, c0.Value.x, c0.Value.y, c0.Value.z, c0.Value.w);
 					}
 					ClearScissors();
 				}
@@ -420,7 +429,7 @@ void C3DProjector::RenderDrawLists(ImDrawData* draw_data)
 }
 
 // http://forum.devmaster.net/t/advanced-rasterization/6145
-bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight)
+bool C3DProjectorImpl::TriangleDraw(uint8_t* frameBuffer, const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight)
 {
 	bool bDrawn = false;
 
@@ -572,7 +581,7 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 									blue	= static_cast<int>(round(((c2.Value.z + c0.Value.z + c1.Value.z) * 255) / 3));
 									alpha	= static_cast<int>(round(((c2.Value.w + c0.Value.w + c1.Value.w) * pTexture[vtx + vty * nTextureWidth]) / 3.0) );
 								}
-								BlendColor(ix, iy, red, green, blue, alpha);
+								BlendColor(frameBuffer, ix, iy, red, green, blue, alpha);
 								bDrawn = true;
 							}
 							else if (ix >= m_szViewport.cx)
@@ -617,7 +626,7 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 
 									const auto a = static_cast<int>(round((c2.Value.w * CX1 + c0.Value.w * CX2 + c1.Value.w * CX3) * iC1 * pTexture[tx + ty * nTextureWidth]));
 
-									BlendColor(ix, iy, r, g, b, a);
+									BlendColor(frameBuffer, ix, iy, r, g, b, a);
 									bDrawn = true;
 								}
 							}
@@ -642,15 +651,28 @@ bool C3DProjector::TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& ver
 	return bDrawn;
 }
 
-
-void C3DProjector::BlendColor(int x, int y, int r, int g, int b, int a)
+void C3DProjectorImpl::BlendColor(uint8_t* frameBuffer, int x, int y, int r, int g, int b, int a)
 {
 	if (!m_bClip || (x >= m_rectClip.left && x <= m_rectClip.right && y >= m_rectClip.top && y <= m_rectClip.bottom))
 	{
-		auto back = (pixel_t*) &m_pCurrentFrameBuffer[x*sizeof(pixel_t) + y * m_nStride];
+		auto back = (pixel_t*) &frameBuffer[x*sizeof(pixel_t) + y * m_nStride];
 
 		back->r += ((r - back->r) * a / 255);
 		back->g += ((g - back->g) * a / 255);
 		back->b += ((b - back->b) * a / 255);
 	}
+}
+
+void C3DProjectorImpl::SetScissors(int left, int top, int right, int bottom)
+{
+	m_rectClip.left = left;
+	m_rectClip.top = top;
+	m_rectClip.right = right;
+	m_rectClip.bottom = bottom;
+	m_bClip = true;
+}
+
+void C3DProjectorImpl::ClearScissors()
+{
+	m_bClip = false;
 }

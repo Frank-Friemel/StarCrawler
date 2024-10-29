@@ -19,29 +19,30 @@
 
 #define TIMER_ID					9999
 
-#define DEFAULT_FLIGHT_SPEED		(-0.1)
+#define DEFAULT_FLIGHT_SPEED		(62.0 / (-100.0))
 #define	DEFAULT_SCROLL_SPEED		(0.02)
 #define STAR_FIELD_DISTANCE			(-80.0)
 #define FADEOUT_MARKER_PERCENT		(90)		// begin to fade out scene at 90%
 
+using namespace local_utils;
 
 CProjectorDlg::frame_buffer_t::frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount)
+	: sz{ nWidth , nHeight }
+	, bits{ nBitplaneCount * 8 }
 {
-	sz.cx = nWidth;
-	sz.cy = nHeight;
-
-	bits  = nBitplaneCount * 8;
-
 	ATLVERIFY(SUCCEEDED(CreateDibmap(NULL, &sz, bits, (void**)&m_pFrameBuffer, &hbmp)));
 }
 
 CProjectorDlg::frame_buffer_t::~frame_buffer_t()
 {
 	if (hbmp)
+	{
 		DeleteObject(hbmp);
+	}
 }
 
 CProjectorDlg::CProjectorDlg()
+	: m_vecUp{ glm::dvec3(0, 1, 0) }
 {
 	m_nWidth				= 1280;
 	m_nHeight				= 720;
@@ -64,7 +65,7 @@ CProjectorDlg::CProjectorDlg()
 
 	wcscpy_s(m_LogFont.lfFaceName, _countof(m_LogFont.lfFaceName), L"Arial Narrow");
 
-	m_nStarCount			= 300;
+	m_nStarCount			= 680;
 	m_bExportMode			= false;
 	m_nFramesTotal			= (int)(m_lfVideoLenInSeconds * m_lfFramesPerSecond);
 	m_nBitPlaneCount		= m_bExportMode ? 3 : 4;
@@ -76,7 +77,6 @@ CProjectorDlg::CProjectorDlg()
 
 	m_bHeadupDisplay		= true;
 }
-
 
 CProjectorDlg::~CProjectorDlg()
 {
@@ -93,7 +93,7 @@ void CProjectorDlg::StopAudio()
 	}
 }
 
-void CProjectorDlg::OnPlayAudio(BYTE* pStream, ULONG dwLen)
+void CProjectorDlg::OnPlayAudio(uint8_t* pStream, ULONG dwLen)
 {
 	if (dwLen)
 	{
@@ -103,7 +103,7 @@ void CProjectorDlg::OnPlayAudio(BYTE* pStream, ULONG dwLen)
 		DWORD	dwRead		= 0;
 		DWORD	dwReadTotal	= 0;
 
-		CTempBuffer<BYTE> buf(dwLen);
+		CTempBuffer<uint8_t> buf(dwLen);
 
 		while (nTry > 0 && dwLen && ::ReadFile(m_hAudioData, buf + dwReadTotal, dwLen, &dwRead, NULL))
 		{
@@ -140,10 +140,9 @@ LRESULT CProjectorDlg::OnInitDialog(HWND, LPARAM)
 
 	m_bSuccess				= false;
 	m_bPaused				= false;
-	m_pCurrentFrameBuffer	= NULL;
 	m_nBitPlaneCount		= m_bExportMode ? 3 : 4;
 
-	m_nFrameCounter.reset();
+	m_nFrameCounter			= 0;
 	m_nFramesTotal			= (int)(m_lfVideoLenInSeconds * m_lfFramesPerSecond);
 				
 	m_nRandSeed				= (UINT)::time(NULL);
@@ -390,7 +389,7 @@ LRESULT CProjectorDlg::OnInitDialog(HWND, LPARAM)
 		for (int i = 0; i < 2; ++i)
 		{
 			pFrameBuffer = std::make_shared<frame_buffer_t>(m_nWidth, m_nHeight, m_nBitPlaneCount);
-			m_qInput.queue(pFrameBuffer);
+			m_qInput.queue(move(pFrameBuffer));
 		}
 		// build frame buffers in worker thread
 		ATLVERIFY(CMyThread::Start(m_qInput.m_hEvent));
@@ -429,7 +428,9 @@ void CProjectorDlg::OnClose(UINT, int wID, HWND)
 	m_qOutput.clear();
 
 	if (wID == IDCANCEL && m_bExportMode)
+	{
 		MessageBox(L"The task has been canceled", L"Information", MB_OK | MB_ICONINFORMATION);
+	}
 	EndDialog(wID);
 }
 
@@ -438,37 +439,30 @@ void CProjectorDlg::OnEvent()
 	// this worker thread constructs the frames
 	std::shared_ptr<frame_buffer_t> pFrameBuffer;
 
-	// whenever a frame buffer is available -> fill it
+	// whenever a frame buffer is available -> draw 3D scene to frame buffer
 	while (m_qInput.unqueue(pFrameBuffer))
 	{
-		// draw 3D scene to frame buffer
-		m_pCurrentFrameBuffer = *pFrameBuffer;
-
-		if (!m_bExportMode && m_bHeadupDisplay)
-		{ 
-			NewFrameImGui();
-		}
-
 		// the universe is "black"
-		memset(m_pCurrentFrameBuffer, 0, m_nWidth * m_nHeight * m_nBitPlaneCount);
+		memset(*pFrameBuffer, 0, m_nWidth * m_nHeight * m_nBitPlaneCount);
 
 		// draw stars in background
-		for each (auto& star in m_listStars)
+		for (const auto& star : m_listStars)
 		{
-			star->Draw(this);
+			star->Draw(this, *pFrameBuffer);
 		}
 		// draw the message  
-		for each (auto& word in m_listWords)
+		for (const auto& word : m_listWords)
 		{
-			word->Draw(this);
+			word->Draw(this, *pFrameBuffer);
 		}
 		if (!m_bExportMode && m_bHeadupDisplay)
+		{
+			NewFrameImGui(*pFrameBuffer);
 			RenderImGui();
-
-		m_pCurrentFrameBuffer = NULL;
+		}
 
 		// the frame is done -> queue frame buffer to main thread
-		m_qOutput.queue(pFrameBuffer);
+		m_qOutput.queue(move(pFrameBuffer));
 
 		// update 3D data of scene
 		if (!m_bPaused)
@@ -478,12 +472,12 @@ void CProjectorDlg::OnEvent()
 		m_matCamView = glm::lookAt(glm::dvec3(m_posCam.x, m_posCam.y, m_posCam.z), glm::dvec3(m_posView.x, m_posView.y, m_posView.z), m_vecUp);
 
 		// star field update
-		for each (auto& star in m_listStars)
+		for (auto& star : m_listStars)
 		{
 			if (!star->IsVisible(this))
 			{
 				// revisit flight passed stars which gives the illusion of an infinite star field
-				star->Randomize(this, star->m_vecVertices[0].z + STAR_FIELD_DISTANCE);
+				RandomizeStar(star);
 				ATLASSERT(star->IsVisible(this));
 			}
 		}
@@ -492,7 +486,7 @@ void CProjectorDlg::OnEvent()
 		{
 			size_t n = m_listWords.size() * 25 / 100;
 
-			for each (auto& word in m_listWords)
+			for (const auto& word : m_listWords)
 			{
 				word->SetAlpha(word->GetAlpha() - 0.001);
 
@@ -503,23 +497,27 @@ void CProjectorDlg::OnEvent()
 			{
 				size_t n = m_listWords.size() * 50 / 100;
 
-				for each (auto& word in m_listWords)
+				for (const auto& word : m_listWords)
 				{
 					word->SetAlpha(word->GetAlpha() - 0.001);
 
 					if (--n == 0)
+					{
 						break;
+					}
 				}
 				if (m_nProgress >= 60)
 				{
 					size_t n = m_listWords.size() * 75 / 100;
 
-					for each (auto& word in m_listWords)
+					for (const auto& word : m_listWords)
 					{
 						word->SetAlpha(word->GetAlpha() - 0.001);
 
 						if (--n == 0)
+						{
 							break;
+						}
 					}
 					if (m_nProgress >= 65)
 					{
@@ -546,8 +544,9 @@ void CProjectorDlg::OnTimer(UINT_PTR)
 		{
 			// ...yes!
 			if (!m_bPaused)
-				m_nFrameCounter.increment();
-
+			{
+				m_nFrameCounter++;
+			}
 			if (m_bExportMode)
 			{
 				// PPM format expects 3 color planes!
@@ -577,7 +576,7 @@ void CProjectorDlg::OnTimer(UINT_PTR)
 
 				CDC dcSrc(::CreateCompatibleDC(dcDest));
 				ATLASSERT(dcSrc.m_hDC != NULL);
-				HBITMAP hBmpOld = dcSrc.SelectBitmap(pFrameBuffer->hbmp);
+				const HBITMAP hBmpOld = dcSrc.SelectBitmap(pFrameBuffer->hbmp);
 				
 				dcDest.BitBlt(0, 0, m_nWidth, m_nHeight, dcSrc, 0, 0, SRCCOPY);
 				dcSrc.SelectBitmap(hBmpOld);
@@ -592,20 +591,20 @@ void CProjectorDlg::OnTimer(UINT_PTR)
 			else
 			{
 				// queue frame buffer to be re-filled with pixels
-				m_qInput.queue(pFrameBuffer);
+				m_qInput.queue(move(pFrameBuffer));
 			}
 		}
 		else if (!m_bExportMode)
 		{
 			WCHAR buf[256];
 		
-			swprintf_s(buf, 256, L"Missing frame at %d %% (Frame #%d of #%d Frames)\n", m_nProgress, m_nFrameCounter.get(), m_nFramesTotal);
+			swprintf_s(buf, 256, L"Missing frame at %d %% (Frame #%d of #%d Frames)\n", m_nProgress, m_nFrameCounter.load(), m_nFramesTotal);
 			OutputDebugStringW(buf);
 		}	
 	}
 }
 
-void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha)
+void CProjectorDlg::PolyDraw(uint8_t* frameBuffer, const PolyPoint* polyPoints, size_t count, double r, double g, double b, double alpha)
 {
 	// beautiful agg polygon rendering ....
 	agg::path_storage ps;
@@ -613,37 +612,39 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 
 	ps.remove_all();
 
-	while (n--)
+	auto& vertices = ps.vertices();
+
+	while (count--)
 	{
-		switch (*lpbTypes++)
+		switch (polyPoints->pathType)
 		{
 			case PT_MOVETO:
 			{
-				ps.vertices().add_vertex(lppt->x, lppt->y, agg::path_cmd_move_to);
+				vertices.add_vertex(polyPoints->pixel.x, polyPoints->pixel.y, agg::path_cmd_move_to);
 			}
 			break;
 
 			case PT_LINETO:
 			{
-				ps.vertices().add_vertex(lppt->x, lppt->y, agg::path_cmd_line_to);
+				vertices.add_vertex(polyPoints->pixel.x, polyPoints->pixel.y, agg::path_cmd_line_to);
 			}
 			break;
 
 			case PT_BEZIERTO:
 			{
-				ps.vertices().add_vertex(lppt->x, lppt->y, agg::path_cmd_curve3);
+				vertices.add_vertex(polyPoints->pixel.x, polyPoints->pixel.y, agg::path_cmd_curve3);
 			}
 			break;
 
 			case PT_CCW_EX:
 			{
-				ps.vertices().add_vertex(lppt->x, lppt->y, agg::path_cmd_end_poly | agg::path_flags_close | agg::path_flags_ccw);
+				vertices.add_vertex(polyPoints->pixel.x, polyPoints->pixel.y, agg::path_cmd_end_poly | agg::path_flags_close | agg::path_flags_ccw);
 			}
 			break;
 
 			case PT_STOP:
 			{
-				ps.vertices().add_vertex(lppt->x, lppt->y, agg::path_cmd_stop);
+				vertices.add_vertex(polyPoints->pixel.x, polyPoints->pixel.y, agg::path_cmd_stop);
 			}
 			break;
 
@@ -653,7 +654,7 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 			}
 			break;
 		}
-		++lppt;
+		++polyPoints;
 	}
 	ps.close_polygon();
 
@@ -663,7 +664,7 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 	ras.gamma(agg::gamma_linear());
 	ras.add_path(curve);
 
-	agg::rendering_buffer rbuf(m_pCurrentFrameBuffer, m_nWidth, m_nHeight, m_nStride);
+	agg::rendering_buffer rbuf(frameBuffer, m_nWidth, m_nHeight, m_nStride);
 
 	// do some fading effect after we've reached 90% 
 	if (m_nProgress >= FADEOUT_MARKER_PERCENT)
@@ -671,7 +672,9 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 		alpha *= ((100 - m_nProgress) / 10.0);
 
 		if (alpha > 1.0)
+		{
 			alpha = 1.0;
+		}
 	}
 
 	if (m_nBitPlaneCount == 4)
@@ -680,8 +683,9 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 		agg::renderer_base<agg::pixfmt_bgra32>	ren(pixf);
 
 		if (m_bClip)
+		{
 			ren.clip_box(m_rectClip.left, m_rectClip.top, m_rectClip.right, m_rectClip.bottom);
-
+		}
 		agg::render_scanlines_aa_solid(ras, sl, ren, agg::rgba(r, g, b, alpha));
 	}
 	else
@@ -690,8 +694,9 @@ void CProjectorDlg::PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n
 		agg::renderer_base<agg::pixfmt_rgb24>	ren(pixf);
 
 		if (m_bClip)
+		{
 			ren.clip_box(m_rectClip.left, m_rectClip.top, m_rectClip.right, m_rectClip.bottom);
-
+		}
 		agg::render_scanlines_aa_solid(ras, sl, ren, agg::rgba(r, g, b, alpha));
 	}
 }
@@ -714,7 +719,6 @@ bool CProjectorDlg::CreateScene()
 	m_posView	= matTransStartOffset * m_posView;
 	m_matScroll = glm::translate(glm::dvec3(0, 0, m_lfScrollSpeed));
 	m_matFlight = glm::translate(glm::dvec3(0, 0, m_lfFlightSpeed));
-	m_vecUp		= glm::dvec3(0, 1, 0);
 
 	m_matCamView = glm::lookAt(glm::dvec3(m_posCam.x, m_posCam.y, m_posCam.z), glm::dvec3(m_posView.x, m_posView.y, m_posView.z), m_vecUp);
 
@@ -724,8 +728,9 @@ bool CProjectorDlg::CreateScene()
 	C3DGlyph glyphSpace;
 
 	if (!glyphSpace.Create(L'l', &m_LogFont))
+	{
 		return false;
-
+	}
 	glyphSpace.RotateX(90.0);
 	glyphSpace.Scale(m_lfFontScale);
 
@@ -754,11 +759,11 @@ bool CProjectorDlg::CreateScene()
 	// sprinkle some stars
 	while ((int)m_listStars.size() < m_nStarCount)
 	{
-		std::shared_ptr<C3DStar> pStar = std::make_shared<C3DStar>();
+		std::shared_ptr<C3DStar> star = std::make_shared<C3DStar>();
 
-		pStar->Randomize(this, STAR_FIELD_DISTANCE);
+		RandomizeStar(star);
 
-		m_listStars.push_back(pStar);
+		m_listStars.emplace_back(move(star));
 	}
 	// calc start position for the scroll text
 	posLeftBorder.z += (fabs(boundsSpace.z) * 1.5 + m_bExportMode ? 0.9 : 0.0);
@@ -884,8 +889,8 @@ void CProjectorDlg::MoveScene(int nSteps /* = 1*/)
 	{
 		nSteps *= (-1);
 
-		glm::dmat4 matScroll = glm::inverse(m_matScroll);
-		glm::dmat4 matFlight = glm::inverse(glm::translate(glm::dvec3(0, 0, DEFAULT_FLIGHT_SPEED)));
+		const glm::dmat4 matScroll = glm::inverse(m_matScroll);
+		const glm::dmat4 matFlight = glm::inverse(glm::translate(glm::dvec3(0, 0, DEFAULT_FLIGHT_SPEED)));
 
 		do
 		{
@@ -1007,7 +1012,7 @@ void CProjectorDlg::RenderImGui()
 
 					if (nProgress <= 50)
 					{
-						for each (auto& word in m_listWords)
+						for each (auto & word in m_listWords)
 						{
 							word->SetAlpha(1);
 						}
@@ -1041,13 +1046,13 @@ void CProjectorDlg::RenderImGui()
 				CreateScene();
 				MoveScene(m_nFrameCounter);
 			}
-			int nScrollSpeed = (int) GetScrollSpeed();
+			int nScrollSpeed = (int)GetScrollSpeed();
 
 			if (ImGui::SliderInt("Scroll Speed", &nScrollSpeed, 1, 10))
 			{
 				SetScrollSpeed((UINT)nScrollSpeed);
 			}
-			int nFlightSpeed = (int) GetFlightSpeed();
+			int nFlightSpeed = (int)GetFlightSpeed();
 
 			if (ImGui::SliderInt("Flight Speed", &nFlightSpeed, 5, 100))
 			{
@@ -1077,6 +1082,62 @@ void CProjectorDlg::RenderImGui()
 	ImGui::End();
 
 	// Rendering
-	C3DProjector::RenderImGui();
+	C3DProjectorImpl::RenderImGui();
 }
 
+void CProjectorDlg::RandomizeStar(std::shared_ptr<C3DStar>& star)
+{
+	ATLASSERT(star);
+
+	const double lfMoveToDistance = (star->m_vecVertices.empty() ? (double)0 : (double)star->m_vecVertices[0].z) + STAR_FIELD_DISTANCE;
+
+	star->InitNew();
+
+	const PIXEL2D ptScreen
+	{
+		5.0 + (GetWidth() - 10.0) * Random(),
+		5.0 + (GetHeight() - 10.0) * Random()
+	};
+
+	glm::dvec4 coord(0, 0, 0, 1);
+	PixelToVertexStaticZ(lfMoveToDistance - 50.0 * Random(), coord, ptScreen);
+
+	ATLASSERT(IsVisible(coord));
+
+	star->SetColor(0.7 + 0.3 * Random(), 0.7 + 0.3 * Random(), 0.7 + 0.3 * Random());
+	star->Scale(0.12 + (Random() - 0.5) / 50.0);
+	star->Move(coord);
+}
+
+int	CProjectorDlg::GetProgress() const
+{
+	const auto nFrameCount = m_nFrameCounter.load();
+
+	if (nFrameCount >= m_nFramesTotal)
+	{
+		return 100;
+	}
+	return (nFrameCount * 100) / m_nFramesTotal;
+}
+
+UINT CProjectorDlg::GetScrollSpeed() const
+{
+	return static_cast<UINT>(m_lfScrollSpeed * 100.0);
+}
+
+void CProjectorDlg::SetScrollSpeed(UINT v)
+{
+	m_lfScrollSpeed = v / 100.0;
+	m_matScroll = glm::translate(glm::dvec3(0, 0, m_lfScrollSpeed));
+}
+
+UINT CProjectorDlg::GetFlightSpeed() const
+{
+	return static_cast<UINT>(m_lfFlightSpeed * (-100.0));
+}
+
+void CProjectorDlg::SetFlightSpeed(UINT v)
+{
+	m_lfFlightSpeed = v / (-100.0);
+	m_matFlight = glm::translate(glm::dvec3(0, 0, m_lfFlightSpeed));
+}

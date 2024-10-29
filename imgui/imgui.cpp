@@ -2117,9 +2117,11 @@ int ImGui::GetFrameCount()
     return GImGui->FrameCount;
 }
 
-void ImGui::NewFrame()
+void ImGui::NewFrame(uint8_t* frameBuffer)
 {
     ImGuiContext& g = *GImGui;
+
+    g.RenderDrawData.frameBuffer = frameBuffer;
 
     // Check user data
     IM_ASSERT(g.IO.DeltaTime >= 0.0f);               // Need a positive DeltaTime (zero is tolerated but will cause some timing issues)
@@ -2707,6 +2709,7 @@ void ImGui::EndFrame()
 void ImGui::Render()
 {
     ImGuiContext& g = *GImGui;
+
     IM_ASSERT(g.Initialized);   // Forgot to call ImGui::NewFrame()
 
     if (g.FrameCountEnded != g.FrameCount)

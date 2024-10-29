@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "3DGlyph.h"
-#include "3DProjector.h"
 
 #ifndef GGO_UNHINTED
 #define GGO_UNHINTED 0x0100
@@ -11,11 +10,9 @@ static inline double fx_to_dbl(const FIXED& p)
 	return double(p.value) + double(p.fract) * (1.0 / 65536.0);
 }
 
-
 C3DGlyph::C3DGlyph()
 {
 }
-
 
 C3DGlyph::~C3DGlyph()
 {
@@ -39,9 +36,10 @@ bool C3DGlyph::Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted /*= false*/
 	CFont newFont;
 
 	if (!newFont.CreateFontIndirect(pLogFont))
+	{
 		return false;
-
-	double lfScale = 25.0;
+	}
+	const double lfScale = 25.0;
 
 	bool	bResult = false;
 	auto	pOldFont = hdc.SelectFont(newFont);
@@ -54,7 +52,7 @@ bool C3DGlyph::Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted /*= false*/
 	mat2.eM22.value = 1;
 
 	ULONG buf_size = 16384 - 32;
-	CTempBuffer<BYTE>	gbuf(buf_size);
+	CTempBuffer<uint8_t>	gbuf(buf_size);
 
 	int total_size = ::GetGlyphOutlineW(hdc, c, GGO_NATIVE | (bHinted ? 0 : GGO_UNHINTED), &gm, buf_size, gbuf, &mat2);
 
@@ -66,15 +64,15 @@ bool C3DGlyph::Create(WCHAR c, const LOGFONT* pLogFont, bool bHinted /*= false*/
 		m_vecVertices.push_back(glm::dvec4(0, 0, 0, 1));
 		m_vecVertices.push_back(glm::dvec4((double)((gm.gmBlackBoxX > (UINT)gm.gmCellIncX) ? gm.gmBlackBoxX : (UINT)gm.gmCellIncX) / lfScale, ((double)gm.gmBlackBoxY) / lfScale * (-1.0), 0, 1));
 
-		const BYTE* cur_glyph = gbuf;
-		const BYTE* end_glyph = gbuf + total_size;
+		const uint8_t* cur_glyph = gbuf;
+		const uint8_t* end_glyph = gbuf + total_size;
 
 		while (cur_glyph < end_glyph)
 		{
 			const TTPOLYGONHEADER* th = (const TTPOLYGONHEADER*)cur_glyph;
 
-			const BYTE* end_poly = cur_glyph + th->cb;
-			const BYTE* cur_poly = cur_glyph + sizeof(TTPOLYGONHEADER);
+			const uint8_t* end_poly = cur_glyph + th->cb;
+			const uint8_t* cur_poly = cur_glyph + sizeof(TTPOLYGONHEADER);
 
 			m_vecVertices.push_back(glm::dvec4(fx_to_dbl(th->pfxStart.x) / lfScale, -fx_to_dbl(th->pfxStart.y) / lfScale, 0, 1));
 			m_vecFaces.push_back(face_t(m_vecVertices.size()-1, PT_MOVETO));

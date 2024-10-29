@@ -8,6 +8,8 @@
 #include "MainDlg.h"
 #include "ProjectorDlg.h"
 
+using namespace local_utils;
+
 CMainDlg::CMainDlg()
 {
 	m_pProjectorDlg	= new CProjectorDlg;

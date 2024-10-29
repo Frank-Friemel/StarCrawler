@@ -8,7 +8,7 @@ public:
 	C3DStar();
 	~C3DStar();
 
-	void Randomize(C3DProjector* pProjector, double lfMoveToDistance);
-
+public:
+	void InitNew();
 };
 

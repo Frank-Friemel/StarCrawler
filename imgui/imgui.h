@@ -15,6 +15,7 @@
 #include <stdarg.h>         // va_list
 #include <stddef.h>         // ptrdiff_t, NULL
 #include <string.h>         // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp
+#include <stdint.h>
 
 #define IMGUI_VERSION       "1.50 WIP"
 
@@ -112,7 +113,7 @@ namespace ImGui
     IMGUI_API ImGuiIO&      GetIO();
     IMGUI_API ImGuiStyle&   GetStyle();
     IMGUI_API ImDrawData*   GetDrawData();                              // same value as passed to your io.RenderDrawListsFn() function. valid after Render() and until the next call to NewFrame()
-    IMGUI_API void          NewFrame();                                 // start a new ImGui frame, you can submit any command from this point until NewFrame()/Render().
+    IMGUI_API void          NewFrame(uint8_t* frameBuffer);             // start a new ImGui frame, you can submit any command from this point until NewFrame()/Render().
     IMGUI_API void          Render();                                   // ends the ImGui frame, finalize rendering data, then call your io.RenderDrawListsFn() function if set.
     IMGUI_API void          Shutdown();
     IMGUI_API void          ShowUserGuide();                            // help block
@@ -1252,6 +1253,7 @@ struct ImDrawData
     int             CmdListsCount;
     int             TotalVtxCount;          // For convenience, sum of all cmd_lists vtx_buffer.Size
     int             TotalIdxCount;          // For convenience, sum of all cmd_lists idx_buffer.Size
+    uint8_t*        frameBuffer = nullptr;
 
     // Functions
     ImDrawData() { Valid = false; CmdLists = NULL; CmdListsCount = TotalVtxCount = TotalIdxCount = 0; }

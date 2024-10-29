@@ -1,18 +1,17 @@
 #include "stdafx.h"
 #include "3DModel.h"
-#include "3DProjector.h"
 #include <fstream>
 #include <sstream>
 
-C3DModel::C3DModel(PCWSTR strModelFile /*= NULL*/)
+using namespace std;
+
+C3DModel::C3DModel(const char* strModelFile /*= NULL*/)
 {
 	if (strModelFile)
 	{
-		USES_CONVERSION;
-
 		std::ifstream in;
 
-		in.open(W2CA(strModelFile), std::ifstream::in);
+		in.open(strModelFile, std::ifstream::in);
 	
 		if (in.good())
 		{
@@ -69,38 +68,30 @@ void C3DModel::Clear()
 	m_vecFaces.clear();
 }
 
-void C3DModel::Draw(C3DProjector* pProjector)
+void C3DModel::Draw(I3DProjector* pProjector, uint8_t* frameBuffer) const
 {
 	ATLASSERT(pProjector);
-
-	vector<PIXEL2D>	vecPoints(m_vecVertices.size());
-
-	size_t i = 0;
+	ATLASSERT(frameBuffer);
 
 	bool bIsVisible = false;
 
-	for each(auto& v in m_vecVertices)
-	{
-		pProjector->VertexToPixel(v, vecPoints[i]);
+	const size_t count = m_vecFaces.size();
 
-		if (!bIsVisible && pProjector->IsVisible(vecPoints[i]))
+	vector<PolyPoint> vecPolyPoints(count);
+
+	auto polyPoint = vecPolyPoints.data();
+
+	for (const auto& f : m_vecFaces)
+	{
+		if (pProjector->IsVisible(m_vecVertices[f.first], &polyPoint->pixel))
+		{
 			bIsVisible = true;
-		++i;
+		}
+		polyPoint->pathType = f.second;
+		++polyPoint;
 	}
 	if (bIsVisible)
 	{
-		size_t n = m_vecFaces.size();
-
-		vector<PIXEL2D>	vecPolyPoints(n);
-		vector<BYTE>	vecPolyTypes(n);
-
-		i = 0;
-
-		for each(auto&f in m_vecFaces)
-		{
-			vecPolyPoints[i] = vecPoints[f.first];
-			vecPolyTypes[i++] = f.second;
-		}
-		pProjector->PolyDraw(&vecPolyPoints.front(), &vecPolyTypes.front(), n, m_colR, m_colG, m_colB, m_alpha);
+		pProjector->PolyDraw(frameBuffer, vecPolyPoints.data(), count, m_colR, m_colG, m_colB, m_alpha);
 	}
 }

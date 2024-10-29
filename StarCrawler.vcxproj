@@ -82,7 +82,6 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <MinimalRebuild>true</MinimalRebuild>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <Optimization>Disabled</Optimization>
@@ -118,12 +117,12 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <MinimalRebuild>true</MinimalRebuild>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WINDOWS;STRICT;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\wtl\include;..\glm-0.9.8.3;.\agg\include</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -204,6 +203,7 @@
       <Optimization>Full</Optimization>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -240,7 +240,7 @@
     <ClCompile Include="3DGlyph.cpp" />
     <ClCompile Include="3DModel.cpp" />
     <ClCompile Include="3DObject.cpp" />
-    <ClCompile Include="3DProjector.cpp" />
+    <ClCompile Include="3DProjectorImpl.cpp" />
     <ClCompile Include="3DStar.cpp" />
     <ClCompile Include="3DWord.cpp" />
     <ClCompile Include="agg\agg_arc.cpp" />
@@ -275,11 +275,12 @@
     <ClInclude Include="3DGlyph.h" />
     <ClInclude Include="3DModel.h" />
     <ClInclude Include="3DObject.h" />
-    <ClInclude Include="3DProjector.h" />
+    <ClInclude Include="3DProjectorImpl.h" />
     <ClInclude Include="3DStar.h" />
     <ClInclude Include="3DWord.h" />
     <ClInclude Include="agg\include\agg_pixfmt_rgba.h" />
     <ClInclude Include="AudioPlayer.h" />
+    <ClInclude Include="I3DProjector.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_internal.h" />

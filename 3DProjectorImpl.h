@@ -1,63 +1,45 @@
 //////////////////////////////////////////////////////////////
-// 3DProjector.h
+// 3DProjectorImpl.h
+
+#pragma once
 
 #pragma once
 
 #include "imgui\imgui.h"
+#include "I3DProjector.h"
 
-typedef struct
-{
-	double x;
-	double y;
-} PIXEL2D;
-
-class C3DProjector
+class C3DProjectorImpl 
+	: public I3DProjector
 {
 public:
-	C3DProjector(double zCam = 10, double zViewer = 1200);
-	~C3DProjector();
+	C3DProjectorImpl(double zCam = 10, double zViewer = 1200);
+	~C3DProjectorImpl();
 
 	void Prepare(const SIZE& sz, UINT nBitplaneCount);
-	void VertexToPixel(const glm::dvec4& v, PIXEL2D& ptPixel) const;
+	
+	// 3D to 2D projection
+	void	VertexToPixel(const glm::dvec4& vertex, PIXEL2D& ptPixel) const noexcept override;
+	bool	IsVisible(const glm::dvec4& vertex, PIXEL2D* ptPixel = nullptr) const noexcept override;
 
+protected:
+	// 2D to 3D projection
 	void PixelToVertexStaticX(double xStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const;
 	void PixelToVertexStaticY(double yStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const;
 	void PixelToVertexStaticZ(double zStatic, glm::dvec4& v, const PIXEL2D& ptPixel) const;
 
+	double	GetWidth() const;
+	double	GetHeight() const;
+
 	// 0.0 .... 1.0
-	static double	Random();
+	static double Random();
 
-	inline bool	IsVisible(const glm::dvec4& pos)
-	{
-		PIXEL2D ptScreen;
-		VertexToPixel(pos, ptScreen);
-
-		return IsVisible(ptScreen);
-	}
-	inline bool	IsVisible(const PIXEL2D& ptScreen)
-	{
-		if (ptScreen.x >= 0.0 && ptScreen.x < m_lfWidth && ptScreen.y >= 0.0 && ptScreen.y < m_lfHeight)
-		{
-			return true;
-		}
-		return false;
-	}
-	inline double GetWidth() const
-	{
-		return m_lfWidth;
-	}
-	inline double GetHeight() const
-	{
-		return m_lfHeight;
-	}
-protected:
 	// imgui stuff
 	void InitImGui(HWND hWnd = NULL, bool bIniFile = false);
 	void ShutdownImGui();
-	void NewFrameImGui();
+	void NewFrameImGui(uint8_t* frameBuffer);
 	void RenderImGui();
 
-	BEGIN_MSG_MAP_EX(C3DProjector)
+	BEGIN_MSG_MAP_EX(C3DProjectorImpl)
 		switch (uMsg)
 		{
 			case WM_LBUTTONDOWN:
@@ -146,28 +128,17 @@ protected:
 		}
 	END_MSG_MAP()
 
-public:
-	// implementation
-	virtual void	PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha) = 0;
-	virtual void	BlendColor(int x, int y, int r, int g, int b, int a);
-	virtual void	SetScissors(int left, int top, int right, int bottom)
-	{
-		m_rectClip.left		= left;
-		m_rectClip.top		= top;
-		m_rectClip.right	= right;
-		m_rectClip.bottom	= bottom;
-		m_bClip				= true;
-	}
-	virtual void	ClearScissors()
-	{
-		m_bClip = false;
-	}
 protected:
+	// ImGui stuff
+	virtual void	BlendColor(uint8_t * frameBuffer, int x, int y, int r, int g, int b, int a);
+	virtual void	SetScissors(int left, int top, int right, int bottom);
+	virtual void	ClearScissors();
 	virtual void	RenderDrawLists(ImDrawData* draw_data);
 
 private:
 	static void		ImGui_Impl_RenderDrawLists(ImDrawData* draw_data);
-	bool			TriangleDraw(const ImDrawVert& vertex0, const ImDrawVert& vertex1, const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight);
+	bool			TriangleDraw(uint8_t* frameBuffer, const ImDrawVert& vertex0, const ImDrawVert& vertex1,
+							const ImDrawVert& vertex2, const float* pTexture, int nTextureWidth, int nTextureHeight);
 
 protected:
 	SIZE				m_szViewport;
@@ -177,8 +148,8 @@ protected:
 	double				m_centerV;
 	UINT				m_nStride;
 
-	glm::dvec4			m_c;	// cam 
-	glm::dvec4			m_e;	// viewer
+	const glm::dvec4	m_cameraPosition;	// camera position 
+	const glm::dvec4	m_viewerPosition;	// viewer position
 	
 	CTempBuffer<float>	m_pImGuiTexture;
 	int					m_nTextureWidth;
@@ -191,11 +162,7 @@ protected:
 protected:
 	glm::dmat4			m_matCamView;
 
-protected:
-	unsigned char*		m_pCurrentFrameBuffer;
-
 private:
-	interlocked_t		m_bDoubleClick;
-
+	std::atomic_int		m_bDoubleClick{ 0 };
 };
 

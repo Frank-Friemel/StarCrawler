@@ -26,7 +26,7 @@ ULONGLONG		Shovel(HANDLE hFrom, HANDLE hTo, ULONGLONG nBytesToShovel, bool bInpu
 HANDLE			Exec(LPCWSTR strCmd, WORD wShowWindow = SW_SHOWNORMAL, PHANDLE phStdOut = NULL, PHANDLE phStdIn = NULL) noexcept;
 std::wstring	GetModulePath(HMODULE hModule = NULL, PCWSTR strModuleName = NULL);
 std::wstring	LocateModulePath(PCWSTR strModule, PCWSTR strDefaultExtension = L".exe");
-bool			WritePPMData(HANDLE hTo, const BYTE* pFrameBuffer, int nWidth, int nHeight);
+bool			WritePPMData(HANDLE hTo, const uint8_t* pFrameBuffer, int nWidth, int nHeight);
 void			InitBitmapInfo(__out_bcount(cbInfo) BITMAPINFO *pbmi, ULONG cbInfo, LONG cx, LONG cy, WORD bpp, bool bFlip = true);
 HRESULT			CreateDibmap(HDC hdc, const SIZE *psize, int nBits, __deref_opt_out void **ppvBits, __out HBITMAP* phBmp, bool bFlip = true);
 
@@ -116,13 +116,13 @@ public:
 		ATLVERIFY(m_hEvent.Create(NULL, FALSE, FALSE, NULL));
 	}
 public:
-	inline bool queue(const T& item)
+	inline bool queue(T&& item)
 	{
 		CAutoSyncT<__LockClass> sync(m_mtx);
 
 		if (m_bCanQueue)
 		{
-			push_back(item);
+			emplace_back(std::move(item));
 			sync.Unlock();
 
 			m_hEvent.Set();
@@ -136,7 +136,7 @@ public:
 		
 		if (!__super::empty())
 		{
-			item = front();
+			item = std::move(front());
 			pop_front();
 			return true;
 		}
@@ -159,7 +159,7 @@ public:
 
 		if (!__super::empty())
 		{
-			T item = front();
+			T item = std::move(front());
 			pop_front();
 			sync.Unlock();
 			return true;
@@ -765,132 +765,5 @@ protected:
 
 typedef CTokenizerT<std::wstring>		CTokenizer;
 typedef CTokenizerT<std::string>		CTokenizerA;
-
-////////////////////////////////////////////////////////////////////////////
-// interlocked_t
-
-class interlocked_t
-{
-public:
-	interlocked_t(LONG nInitValue = 0)
-	{ 
-		_value = nInitValue;
-	}
-	inline LONG increment()
-	{
-		// result is the incremented value
-		return InterlockedIncrement(&_value);
-	}
-	inline LONG decrement()
-	{ 
-		// result is the decremented value
-		return InterlockedDecrement(&_value);
-	}
-	// pre-increment 
-	inline LONG operator ++()
-	{
-		return increment(); 
-	}
-	// pre-decrement 
-	inline LONG operator --()
-	{ 
-		return decrement();
-	}
-	inline LONG clear()
-	{
-		// result is the cleared value
-		return InterlockedExchange(&_value, 0); 
-	}
-	inline LONG reset() 
-	{ 
-		return clear();
-	}
-	template<class T>
-	inline T set(T nNewValue)
-	{ 
-		// result is the original value
-		return static_cast<T>(InterlockedExchange(&_value, static_cast<LONG>(nNewValue)));
-	}
-	inline bool set(bool bNewValue)
-	{
-		return set(bNewValue ? 1l : 0l) ? true : false;
-	}
-	inline LONG get() const
-	{ 
-		return InterlockedCompareExchange((volatile LONG *)&_value, 0, 0);
-	}
-	inline operator bool () const
-	{
-		return get() ? true : false;
-	}
-	template<class T>
-	inline operator T () const
-	{
-		return static_cast<T>(get());
-	}
-	template<class T>
-	inline T operator=(T i)
-	{
-		return set(i);
-	}
-	template<class T>
-	inline bool operator==(T i) const
-	{
-		return (static_cast<T>(get())) == i ? true : false;
-	}
-	template<class T>
-	inline bool operator!=(T i) const
-	{
-		return (static_cast<T>(get())) != i ? true : false;
-	}
-	template<class T>
-	inline bool operator<=(T i) const
-	{
-		return (static_cast<T>(get())) <= i ? true : false;
-	}
-	template<class T>
-	inline bool operator>=(T i) const
-	{
-		return (static_cast<T>(get())) >= i ? true : false;
-	}
-	template<class T>
-	inline bool operator<(T i) const
-	{
-		return (static_cast<T>(get())) < i ? true : false;
-	}
-	template<class T>
-	inline bool operator>(T i) const
-	{
-		return (static_cast<T>(get())) > i ? true : false;
-	}
-	inline bool operator!() const
-	{
-		return get() ? false : true;
-	}
-	template<class T>
-	inline T add(T i)
-	{
-		// result is value + i
-		return static_cast<T>(InterlockedAdd(&_value, static_cast<LONG>(i)));
-	}
-	template<class T>
-	inline T sub(T i)
-	{
-		// result is value - i
-		return static_cast<T>(InterlockedAdd(&_value, static_cast<LONG>(i) * (-1)));
-	}
-	template<class T>
-	inline T operator+=(T i)
-	{
-		return add(i);
-	}
-	template<class T>
-	inline T operator-=(T i)
-	{
-		return sub(i);
-	}
-protected:
-	volatile LONG _value;
-};
 
 }

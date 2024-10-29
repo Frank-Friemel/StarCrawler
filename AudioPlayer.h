@@ -27,11 +27,11 @@ public:
 	void		Mute(bool bMute);
 	bool		IsMuted() const;
 		
-	static void FadeSamples(void* pDest, const BYTE* pSrc, ULONG dwBytes, double lfVolume);
+	static void FadeSamples(void* pDest, const uint8_t* pSrc, ULONG dwBytes, double lfVolume);
 
 public:
 	// the default implementation just copies the data over
-	virtual void OnPlayAudio(BYTE* pStream, ULONG dwLen);
+	virtual void OnPlayAudio(uint8_t* pStream, ULONG dwLen);
 
 protected:
 	CHandle								m_hAudioData;

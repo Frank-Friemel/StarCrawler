@@ -48,16 +48,13 @@ extern CAppModule _Module;
 #include <set>
 #include <array>
 #include <functional>
-
-using namespace std;
+#include <atomic>
 
 #include "glm\glm.hpp"
 #include "glm\gtx\transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
 #include "utils.h"
-
-using namespace local_utils;
 
 #if defined _M_IX86
   #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='x86' publicKeyToken='6595b64144ccf1df' language='*'\"")

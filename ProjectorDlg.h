@@ -7,10 +7,14 @@ class C3DGlyph;
 class C3DWord;
 class C3DStar;
 
-#include "3DProjector.h"
+#include "3DProjectorimpl.h"
 #include "AudioPlayer.h"
 
-class CProjectorDlg : public CDialogImpl<CProjectorDlg>, public C3DProjector, protected CMyThread, protected CAudioPlayer
+class CProjectorDlg
+	: public CDialogImpl<CProjectorDlg>
+	, public C3DProjectorImpl
+	, protected local_utils::CMyThread
+	, protected CAudioPlayer
 {
 public:
 	CProjectorDlg();
@@ -23,7 +27,7 @@ public:
 		COMMAND_ID_HANDLER_EX(IDOK, OnClose)
 		COMMAND_ID_HANDLER_EX(IDCANCEL, OnClose)
 		MSG_WM_TIMER(OnTimer)
-		CHAIN_MSG_MAP(C3DProjector)
+		CHAIN_MSG_MAP(C3DProjectorImpl)
 	END_MSG_MAP()
 
 	LRESULT OnInitDialog(HWND, LPARAM);
@@ -31,9 +35,9 @@ public:
 	void	OnTimer(UINT_PTR);
 
 protected:
-	virtual void PolyDraw(const PIXEL2D* lppt, const BYTE* lpbTypes, size_t n, double r, double g, double b, double alpha);
-	virtual void OnEvent();
-	virtual void OnPlayAudio(BYTE* pStream, ULONG dwLen);
+	void	PolyDraw(uint8_t* frameBuffer, const PolyPoint* polyPoints, size_t count, double r, double g, double b, double alpha) override;
+	void	OnEvent() override;
+	void	OnPlayAudio(uint8_t* pStream, ULONG dwLen) override;
 
 private:
 	void	StopAudio();
@@ -43,33 +47,16 @@ private:
 	void	AddTextBlock(std::wstring strTextBlock, bool bCenter, glm::dvec3& posLeftBorder, const glm::dvec3& posRightBorder, const glm::dvec3& boundsSpace, double lfVOffsetFactor = 1.5);
 
 	void	RenderImGui();
-	int		GetProgress() const
-	{
-		auto nFrameCount = m_nFrameCounter.get();
+	int		GetProgress() const;
 
-		if (nFrameCount >= m_nFramesTotal)
-			return 100;
-		return (nFrameCount * 100) / m_nFramesTotal;
-	}
+	void	RandomizeStar(std::shared_ptr<C3DStar>& star);
+
 public:
-	UINT	GetScrollSpeed() const
-	{
-		return static_cast<UINT>(m_lfScrollSpeed*100.0);
-	}
-	void	SetScrollSpeed(UINT v)
-	{
-		m_lfScrollSpeed = v / 100.0;
-		m_matScroll		= glm::translate(glm::dvec3(0, 0, m_lfScrollSpeed));
-	}
-	UINT	GetFlightSpeed() const
-	{
-		return static_cast<UINT>(m_lfFlightSpeed*(-100.0));
-	}
-	void	SetFlightSpeed(UINT v)
-	{
-		m_lfFlightSpeed = v / (-100.0);
-		m_matFlight		= glm::translate(glm::dvec3(0, 0, m_lfFlightSpeed));
-	}
+	UINT	GetScrollSpeed() const;
+	void	SetScrollSpeed(UINT v);
+	UINT	GetFlightSpeed() const;
+	void	SetFlightSpeed(UINT v);
+
 public:
 	int													m_nWidth;
 	int													m_nHeight;
@@ -95,20 +82,20 @@ private:
 	CProgressBarCtrl									m_ctlProgress;
 
 	int													m_nBitPlaneCount;
-	interlocked_t										m_nFrameCounter;
+	std::atomic_int										m_nFrameCounter{ 0 };
 	int													m_nFramesTotal;
 
 	__declspec(property(get=GetProgress))		int		m_nProgress;
 
+	const glm::dvec3									m_vecUp;
 	glm::dvec4											m_posCam;
 	glm::dvec4											m_posView;
 
 	glm::dmat4											m_matScroll;
 	glm::dmat4											m_matFlight;
-	glm::dvec3											m_vecUp;
 
-	std::list< shared_ptr<C3DWord> >					m_listWords;
-	std::list< shared_ptr<C3DStar> >					m_listStars;
+	std::list< std::shared_ptr<C3DWord> >				m_listWords;
+	std::list< std::shared_ptr<C3DStar> >				m_listStars;
 
 	class frame_buffer_t
 	{
@@ -116,27 +103,28 @@ private:
 		frame_buffer_t(int nWidth, int nHeight, int nBitplaneCount);
 		~frame_buffer_t();
 
-		operator unsigned char *()
+		operator uint8_t *()
 		{
 			return m_pFrameBuffer;
 		}
+
 	public:
-		SIZE		sz;
-		int			bits;
-		HBITMAP		hbmp;
-		BYTE*		m_pFrameBuffer;
+		const SIZE		sz;
+		const int		bits;
+		HBITMAP			hbmp;
+		uint8_t*		m_pFrameBuffer;
 	};
 
-	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qInput;
-	CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qOutput;
+	local_utils::CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qInput;
+	local_utils::CMyQueue< std::shared_ptr< frame_buffer_t > >		m_qOutput;
 
-	CHandle												m_hVideoEncoder;
-	CHandle												m_hVideoData;
+	CHandle															m_hVideoEncoder;
+	CHandle															m_hVideoData;
 
-	CHandle												m_hAudioDecoder;
+	CHandle															m_hAudioDecoder;
 
-	CTemporaryFile										m_fileTemp;
-	interlocked_t										m_bPaused;
-	UINT												m_nRandSeed;
+	local_utils::CTemporaryFile										m_fileTemp;
+	std::atomic_bool												m_bPaused{ false };
+	UINT															m_nRandSeed;
 };
 
